@@ -262,7 +262,7 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
     }
 }
 
-// Add image processing methods based on react-native-bluetooth-escpos-printer approach
+// Image processing methods based on react-native-bluetooth-escpos-printer
 
 + (UIImage *)imageWithImage:(UIImage *)image scaledToFillSize:(CGSize)size {
     CGFloat scale = MAX(size.width/image.size.width, size.height/image.size.height);
@@ -296,6 +296,12 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
 }
 
 + (uint8_t *)imageToGreyImage:(UIImage *)image {
+    // Create image rectangle with current image width/height
+    int kRed = 1;
+    int kGreen = 2;
+    int kBlue = 4;
+    int colors = kGreen | kBlue | kRed;
+    
     CGFloat actualWidth = image.size.width;
     CGFloat actualHeight = image.size.height;
     NSLog(@"Converting image to grayscale: %fx%f", actualWidth, actualHeight);
@@ -310,17 +316,16 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
     CGContextRelease(context);
     CGColorSpaceRelease(colorSpace);
     
+    // Convert to grayscale using the same logic as bluetooth escpos printer
     uint8_t *m_imageData = (uint8_t *) malloc(actualWidth * actualHeight);
     for(int y = 0; y < actualHeight; y++) {
         for(int x = 0; x < actualWidth; x++) {
             uint32_t rgbPixel = rgbImage[(int)(y*actualWidth+x)];
-            // Extract RGB components properly
-            uint32_t r = (rgbPixel >> 24) & 255;
-            uint32_t g = (rgbPixel >> 16) & 255;
-            uint32_t b = (rgbPixel >> 8) & 255;
-            // Use standard luminance formula for better grayscale conversion
-            uint32_t gray = (uint32_t)(0.299 * r + 0.587 * g + 0.114 * b);
-            m_imageData[(int)(y*actualWidth+x)] = gray;
+            uint32_t sum = 0, count = 0;
+            if (colors & kRed) {sum += (rgbPixel>>24)&255; count++;}
+            if (colors & kGreen) {sum += (rgbPixel>>16)&255; count++;}
+            if (colors & kBlue) {sum += (rgbPixel>>8)&255; count++;}
+            m_imageData[(int)(y*actualWidth+x)] = sum/count;
         }
     }
     free(rgbImage);
@@ -343,16 +348,12 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
         }
     }
     
-    // Use a more conservative threshold - reduce threshold to make image lighter
     int grayave = graytotal / ysize / xsize;
-    int adjustedThreshold = grayave - (grayave * 0.2); // Decrease threshold by 20% to make image lighter
-    if (adjustedThreshold < 0) adjustedThreshold = 0; // Cap at minimum value
-    
     k = 0;
     for(i = 0; i < ysize; ++i) {
         for(j = 0; j < xsize; ++j) {
             gray = orgpixels[k] & 255;
-            if(gray > adjustedThreshold) {
+            if(gray > grayave) {
                 despixels[k] = 0; // White pixel
             } else {
                 despixels[k] = 1; // Black pixel
@@ -375,6 +376,7 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
     NSInteger nBytesPerLine = (int)nWidth/8;
     unsigned char * data = malloc(nHeight*(8+nBytesPerLine));
     NSInteger k = 0;
+    
     for(int i=0;i<nHeight;i++){
         NSInteger var10 = i*(8+nBytesPerLine);
         //GS v 0 m xL xH yL yH d1....dk 打印光栅位图

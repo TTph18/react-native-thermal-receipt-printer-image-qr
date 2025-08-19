@@ -204,71 +204,231 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
                   printerOptions:(NSDictionary *)options
                   fail:(RCTResponseSenderBlock)errorCallback) {
     @try {
-
         !connected_ip ? [NSException raise:@"Invalid connection" format:@"Can't connect to printer"] : nil;
-        if(![base64Qr  isEqual: @""]){
-            NSString *result = [@"data:image/png;base64," stringByAppendingString:base64Qr];
-            NSURL *url = [NSURL URLWithString:result];
-            NSData *imageData = [NSData dataWithContentsOfURL:url];
+        
+        if(![base64Qr isEqual: @""]){
+            NSInteger nWidth = [[options valueForKey:@"width"] integerValue];
             NSString* printerWidthType = [options valueForKey:@"printerWidthType"];
-
-            NSInteger printerWidth = 576;
-
-            if(printerWidthType != nil && [printerWidthType isEqualToString:@"58"]) {
-                printerWidth = 384;
+            
+            // Set default width based on printer type
+            if (!nWidth) {
+                if (printerWidthType != nil && [printerWidthType isEqualToString:@"58"]) {
+                    nWidth = 384;
+                } else {
+                    nWidth = 576;
+                }
             }
-
-            if(imageData != nil){
-                UIImage* image = [UIImage imageWithData:imageData];
-                UIImage* printImage = [self getPrintImage:image printerOptions:options];
-
-                [[PrinterSDK defaultPrinterSDK] setPrintWidth:printerWidth];
-                [[PrinterSDK defaultPrinterSDK] printImage:printImage ];
+            
+            NSInteger paddingLeft = [[options valueForKey:@"left"] integerValue];
+            if (!paddingLeft) paddingLeft = 0;
+            
+            NSData *decoded = [[NSData alloc] initWithBase64EncodedString:base64Qr options:0];
+            UIImage *srcImage = [[UIImage alloc] initWithData:decoded scale:1];
+            NSData *jpgData = UIImageJPEGRepresentation(srcImage, 1);
+            UIImage *jpgImage = [[UIImage alloc] initWithData:jpgData];
+            
+            NSInteger imgHeight = jpgImage.size.height;
+            NSInteger imagWidth = jpgImage.size.width;
+            NSInteger width = nWidth;
+            CGSize size = CGSizeMake(width, imgHeight*width/imagWidth);
+            UIImage *scaled = [RNNetPrinter imageWithImage:jpgImage scaledToFillSize:size];
+            
+            if (paddingLeft > 0) {
+                scaled = [RNNetPrinter imagePadLeft:paddingLeft withSource:scaled];
+                size = [scaled size];
             }
+            
+            unsigned char *graImage = [RNNetPrinter imageToGreyImage:scaled];
+            unsigned char *formatedData = [RNNetPrinter format_K_threshold:graImage width:size.width height:size.height];
+            NSData *dataToPrint = [RNNetPrinter eachLinePixToCmd:formatedData nWidth:size.width nHeight:size.height nMode:0];
+            
+            // Send data to printer
+            [[PrinterSDK defaultPrinterSDK] setPrintWidth:width];
+            
+            // Convert NSData to hex string
+            NSMutableString *hexString = [[NSMutableString alloc] init];
+            const unsigned char *bytes = [dataToPrint bytes];
+            for (NSUInteger i = 0; i < [dataToPrint length]; i++) {
+                [hexString appendFormat:@"%02X", bytes[i]];
+            }
+            [[PrinterSDK defaultPrinterSDK] sendHex:hexString];
+            
+            // Clean up memory
+            free(graImage);
+            free(formatedData);
         }
     } @catch (NSException *exception) {
         errorCallback(@[exception.reason]);
     }
 }
 
+// Add image processing methods based on react-native-bluetooth-escpos-printer approach
+
++ (UIImage *)imageWithImage:(UIImage *)image scaledToFillSize:(CGSize)size {
+    CGFloat scale = MAX(size.width/image.size.width, size.height/image.size.height);
+    CGFloat width = image.size.width * scale;
+    CGFloat height = image.size.height * scale;
+    CGRect imageRect = CGRectMake((size.width - width)/2.0f,
+                                  (size.height - height)/2.0f,
+                                  width,
+                                  height);
+    
+    UIGraphicsBeginImageContextWithOptions(size, NO, 0);
+    [image drawInRect:imageRect];
+    UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return newImage;
+}
+
++ (UIImage*)imagePadLeft:(NSInteger) left withSource: (UIImage*)source {
+    CGSize orgSize = [source size];
+    CGSize size = CGSizeMake(orgSize.width + [[NSNumber numberWithInteger: left] floatValue], orgSize.height);
+    UIGraphicsBeginImageContext(size);
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSetFillColorWithColor(context,
+                                   [[UIColor whiteColor] CGColor]);
+    CGContextFillRect(context, CGRectMake(0, 0, size.width, size.height));
+    [source drawInRect:CGRectMake(left, 0, orgSize.width, orgSize.height)
+             blendMode:kCGBlendModeNormal alpha:1.0];
+    UIImage *paddedImage =  UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return paddedImage;
+}
+
++ (uint8_t *)imageToGreyImage:(UIImage *)image {
+    CGFloat actualWidth = image.size.width;
+    CGFloat actualHeight = image.size.height;
+    NSLog(@"Converting image to grayscale: %fx%f", actualWidth, actualHeight);
+    
+    uint32_t *rgbImage = (uint32_t *) malloc(actualWidth * actualHeight * sizeof(uint32_t));
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGContextRef context = CGBitmapContextCreate(rgbImage, actualWidth, actualHeight, 8, actualWidth*4, colorSpace,
+                                                 kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipLast);
+    CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
+    CGContextSetShouldAntialias(context, NO);
+    CGContextDrawImage(context, CGRectMake(0, 0, actualWidth, actualHeight), [image CGImage]);
+    CGContextRelease(context);
+    CGColorSpaceRelease(colorSpace);
+    
+    uint8_t *m_imageData = (uint8_t *) malloc(actualWidth * actualHeight);
+    for(int y = 0; y < actualHeight; y++) {
+        for(int x = 0; x < actualWidth; x++) {
+            uint32_t rgbPixel = rgbImage[(int)(y*actualWidth+x)];
+            // Extract RGB components properly
+            uint32_t r = (rgbPixel >> 24) & 255;
+            uint32_t g = (rgbPixel >> 16) & 255;
+            uint32_t b = (rgbPixel >> 8) & 255;
+            // Use standard luminance formula for better grayscale conversion
+            uint32_t gray = (uint32_t)(0.299 * r + 0.587 * g + 0.114 * b);
+            m_imageData[(int)(y*actualWidth+x)] = gray;
+        }
+    }
+    free(rgbImage);
+    return m_imageData;
+}
+
++ (unsigned char *)format_K_threshold:(unsigned char *) orgpixels width:(NSInteger) xsize height:(NSInteger) ysize {
+    unsigned char * despixels = malloc(xsize*ysize);
+    int graytotal = 0;
+    int k = 0;
+    
+    int i;
+    int j;
+    int gray;
+    for(i = 0; i < ysize; ++i) {
+        for(j = 0; j < xsize; ++j) {
+            gray = orgpixels[k] & 255;
+            graytotal += gray;
+            ++k;
+        }
+    }
+    
+    // Use a more conservative threshold - reduce threshold to make image lighter
+    int grayave = graytotal / ysize / xsize;
+    int adjustedThreshold = grayave - (grayave * 0.2); // Decrease threshold by 20% to make image lighter
+    if (adjustedThreshold < 0) adjustedThreshold = 0; // Cap at minimum value
+    
+    k = 0;
+    for(i = 0; i < ysize; ++i) {
+        for(j = 0; j < xsize; ++j) {
+            gray = orgpixels[k] & 255;
+            if(gray > adjustedThreshold) {
+                despixels[k] = 0; // White pixel
+            } else {
+                despixels[k] = 1; // Black pixel
+            }
+            ++k;
+        }
+    }
+    return despixels;
+}
+
++ (NSData *)eachLinePixToCmd:(unsigned char *)src nWidth:(NSInteger) nWidth nHeight:(NSInteger) nHeight nMode:(NSInteger) nMode {
+    int p0[] = { 0, 0x80 };
+    int p1[] = { 0, 0x40 };
+    int p2[] = { 0, 0x20 };
+    int p3[] = { 0, 0x10 };
+    int p4[] = { 0, 0x08 };
+    int p5[] = { 0, 0x04 };
+    int p6[] = { 0, 0x02 };
+    
+    NSInteger nBytesPerLine = (int)nWidth/8;
+    unsigned char * data = malloc(nHeight*(8+nBytesPerLine));
+    NSInteger k = 0;
+    for(int i=0;i<nHeight;i++){
+        NSInteger var10 = i*(8+nBytesPerLine);
+        //GS v 0 m xL xH yL yH d1....dk 打印光栅位图
+        data[var10 + 0] = 29;//GS
+        data[var10 + 1] = 118;//v
+        data[var10 + 2] = 48;//0
+        data[var10 + 3] =  (unsigned char)(nMode & 1);
+        data[var10 + 4] =  (unsigned char)(nBytesPerLine % 256);//xL
+        data[var10 + 5] =  (unsigned char)(nBytesPerLine / 256);//xH
+        data[var10 + 6] = 1;//yL
+        data[var10 + 7] = 0;//yH
+        
+        for (int j = 0; j < nBytesPerLine; ++j) {
+            data[var10 + 8 + j] = (int) (p0[src[k]] + p1[src[k + 1]] + p2[src[k + 2]] + p3[src[k + 3]] + p4[src[k + 4]] + p5[src[k + 5]] + p6[src[k + 6]] + src[k + 7]);
+            k =k+8;
+        }
+    }
+    return [NSData dataWithBytes:data length:nHeight*(8+nBytesPerLine)];
+}
+
 -(UIImage *)getPrintImage:(UIImage *)image
            printerOptions:(NSDictionary *)options {
 
-   NSNumber* nWidth = [options valueForKey:@"imageWidth"];
-   NSNumber* nHeight = [options valueForKey:@"imageHeight"];
+   // Use the original image size, no scaling
+   CGFloat paddingX = 0;
+   CGFloat paddingY = 0;
+
+   // Allow optional padding from JS
    NSNumber* nPaddingX = [options valueForKey:@"paddingX"];
-
-   CGFloat newWidth = 150;
-   if(nWidth != nil) {
-       newWidth = [nWidth floatValue];
-   }
-
-   CGFloat newHeight = image.size.height;
-   if(nHeight != nil) {
-       newHeight = [nHeight floatValue];
-   }
-
-   CGFloat paddingX = 250;
+   NSNumber* nPaddingY = [options valueForKey:@"paddingY"];
    if(nPaddingX != nil) {
        paddingX = [nPaddingX floatValue];
    }
+   if(nPaddingY != nil) {
+       paddingY = [nPaddingY floatValue];
+   }
 
-   CGFloat _newHeight = newHeight;
-   CGSize newSize = CGSizeMake(newWidth, _newHeight);
-   UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0);
-   CGContextRef context = UIGraphicsGetCurrentContext();
-   CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
-   CGImageRef immageRef = image.CGImage;
-   CGContextDrawImage(context, CGRectMake(0, 0, newWidth, newHeight), immageRef);
-   CGImageRef newImageRef = CGBitmapContextCreateImage(context);
-   UIImage* newImage = [UIImage imageWithCGImage:newImageRef];
-
-   CGImageRelease(newImageRef);
-   UIGraphicsEndImageContext();
-
-   UIImage* paddedImage = [self addImagePadding:newImage paddingX:paddingX paddingY:0];
-   return paddedImage;
-
+   // Only add padding if needed
+   if (paddingX > 0 || paddingY > 0) {
+       CGSize orgSize = [image size];
+       CGSize size = CGSizeMake(orgSize.width + paddingX, orgSize.height + paddingY);
+       UIGraphicsBeginImageContext(size);
+       CGContextRef context = UIGraphicsGetCurrentContext();
+       CGContextSetFillColorWithColor(context, [[UIColor whiteColor] CGColor]);
+       CGContextFillRect(context, CGRectMake(0, 0, size.width, size.height));
+       [image drawInRect:CGRectMake(paddingX, paddingY, orgSize.width, orgSize.height)
+                blendMode:kCGBlendModeNormal alpha:1.0];
+       UIImage *paddedImage = UIGraphicsGetImageFromCurrentImageContext();
+       UIGraphicsEndImageContext();
+       return paddedImage;
+   } else {
+       // No padding, return original image
+       return image;
+   }
 }
 
 -(UIImage *)addImagePadding:(UIImage * )image

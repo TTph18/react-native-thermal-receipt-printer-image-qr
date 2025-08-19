@@ -48,6 +48,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
 
     private final static char ESC_CHAR = 0x1B;
     private static final byte[] SELECT_BIT_IMAGE_MODE = {0x1B, 0x2A, 33};
+    private final static byte[] SET_LINE_SPACE_16 = new byte[]{ESC_CHAR, 0x33, 16};
     private final static byte[] SET_LINE_SPACE_24 = new byte[]{ESC_CHAR, 0x33, 24};
     private final static byte[] SET_LINE_SPACE_32 = new byte[]{ESC_CHAR, 0x33, 32};
     private final static byte[] LINE_FEED = new byte[]{0x0A};
@@ -277,7 +278,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
 
             OutputStream printerOutputStream = socket.getOutputStream();
 
-            printerOutputStream.write(SET_LINE_SPACE_24);
+            printerOutputStream.write(SET_LINE_SPACE_16);
             printerOutputStream.write(CENTER_ALIGN);
 
             for (int y = 0; y < pixels.length; y += 24) {
@@ -295,7 +296,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
                 // Do a line feed, if not the printing will resume on the same line
                 printerOutputStream.write(LINE_FEED);
             }
-            printerOutputStream.write(SET_LINE_SPACE_32);
+            printerOutputStream.write(SET_LINE_SPACE_16);
             printerOutputStream.write(LINE_FEED);
 
             printerOutputStream.flush();
@@ -324,7 +325,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
 
             OutputStream printerOutputStream = socket.getOutputStream();
 
-            printerOutputStream.write(SET_LINE_SPACE_24);
+            printerOutputStream.write(SET_LINE_SPACE_16);
             printerOutputStream.write(CENTER_ALIGN);
 
             for (int y = 0; y < pixels.length; y += 24) {
@@ -342,7 +343,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
                 // Do a line feed, if not the printing will resume on the same line
                 printerOutputStream.write(LINE_FEED);
             }
-            printerOutputStream.write(SET_LINE_SPACE_32);
+            printerOutputStream.write(SET_LINE_SPACE_16);
             printerOutputStream.write(LINE_FEED);
 
             printerOutputStream.flush();

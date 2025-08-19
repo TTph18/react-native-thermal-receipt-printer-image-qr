@@ -316,18 +316,20 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
     CGContextRelease(context);
     CGColorSpaceRelease(colorSpace);
     
-    // Convert to grayscale using the same logic as bluetooth escpos printer
+    // Improved grayscale conversion using standard luminance formula
     uint8_t *m_imageData = (uint8_t *) malloc(actualWidth * actualHeight);
     for(int y = 0; y < actualHeight; y++) {
         for(int x = 0; x < actualWidth; x++) {
             uint32_t rgbPixel = rgbImage[(int)(y*actualWidth+x)];
-            uint32_t sum = 0, count = 0;
-            if (colors & kRed) {sum += (rgbPixel>>24)&255; count++;}
-            if (colors & kGreen) {sum += (rgbPixel>>16)&255; count++;}
-            if (colors & kBlue) {sum += (rgbPixel>>8)&255; count++;}
-            m_imageData[(int)(y*actualWidth+x)] = sum/count;
+            uint8_t r = (rgbPixel >> 24) & 0xFF;
+            uint8_t g = (rgbPixel >> 16) & 0xFF;
+            uint8_t b = (rgbPixel >> 8) & 0xFF;
+            // Standard luminance formula
+            uint8_t gray = (uint8_t)(0.299 * r + 0.587 * g + 0.114 * b);
+            m_imageData[(int)(y*actualWidth+x)] = gray;
         }
     }
+    NSLog(@"[imageToGreyImage] width: %f, height: %f", actualWidth, actualHeight);
     free(rgbImage);
     return m_imageData;
 }
@@ -349,11 +351,13 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
     }
     
     int grayave = graytotal / ysize / xsize;
+    int adjustedThreshold = grayave - (int)(grayave * 0.3); // 30% reduction for lighter image
+    if (adjustedThreshold < 0) adjustedThreshold = 0;
     k = 0;
     for(i = 0; i < ysize; ++i) {
         for(j = 0; j < xsize; ++j) {
             gray = orgpixels[k] & 255;
-            if(gray > grayave) {
+            if(gray > adjustedThreshold) {
                 despixels[k] = 0; // White pixel
             } else {
                 despixels[k] = 1; // Black pixel
@@ -361,6 +365,7 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
             ++k;
         }
     }
+    NSLog(@"[format_K_threshold] grayave: %d, adjustedThreshold: %d", grayave, adjustedThreshold);
     return despixels;
 }
 

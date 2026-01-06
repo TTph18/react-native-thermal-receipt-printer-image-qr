@@ -242,6 +242,10 @@ const USBPrinter = {
         reject(new Error("TSPL printing not supported on iOS"));
         return;
       }
+      if (!RNUSBPrinter || typeof RNUSBPrinter.generateTSPLTextLabel !== "function") {
+        reject(new Error("generateTSPLTextLabel is not available. Please rebuild the app after updating the native module."));
+        return;
+      }
       RNUSBPrinter.generateTSPLTextLabel(
         width,
         height,
@@ -265,6 +269,10 @@ const USBPrinter = {
     return new Promise((resolve, reject) => {
       if (Platform.OS === "ios") {
         reject(new Error("TSPL printing not supported on iOS"));
+        return;
+      }
+      if (!RNUSBPrinter || typeof RNUSBPrinter.encodeTSPLCommand !== "function") {
+        reject(new Error("encodeTSPLCommand is not available. Please rebuild the app after updating the native module."));
         return;
       }
       RNUSBPrinter.encodeTSPLCommand(
@@ -297,6 +305,10 @@ const USBPrinter = {
     if (Platform.OS === "ios") {
       console.warn("TSPL printing not supported on iOS");
     } else {
+      if (!RNUSBPrinter || typeof RNUSBPrinter.printTSPLTextLabel !== "function") {
+        console.warn("printTSPLTextLabel is not available. Please rebuild the app after updating the native module.");
+        return;
+      }
       RNUSBPrinter.printTSPLTextLabel(
         width,
         height,
@@ -333,6 +345,10 @@ const USBPrinter = {
         reject(new Error("TSPL printing not supported on iOS"));
         return;
       }
+      if (!RNUSBPrinter || typeof RNUSBPrinter.generateTSPLImageLabel !== "function") {
+        reject(new Error("generateTSPLImageLabel is not available. Please rebuild the app after updating the native module."));
+        return;
+      }
       RNUSBPrinter.generateTSPLImageLabel(
         base64Image,
         labelWidth,
@@ -367,6 +383,10 @@ const USBPrinter = {
     return new Promise((resolve, reject) => {
       if (Platform.OS === "ios") {
         reject(new Error("TSPL printing not supported on iOS"));
+        return;
+      }
+      if (!RNUSBPrinter || typeof RNUSBPrinter.generateTSPLImageLabelFromURL !== "function") {
+        reject(new Error("generateTSPLImageLabelFromURL is not available. Please rebuild the app after updating the native module."));
         return;
       }
       RNUSBPrinter.generateTSPLImageLabelFromURL(
@@ -410,6 +430,10 @@ const USBPrinter = {
     if (Platform.OS === "ios") {
       console.warn("TSPL printing not supported on iOS");
     } else {
+      if (!RNUSBPrinter || typeof RNUSBPrinter.printTSPLImageLabel !== "function") {
+        console.warn("printTSPLImageLabel is not available. Please rebuild the app after updating the native module.");
+        return;
+      }
       RNUSBPrinter.printTSPLImageLabel(
         base64Image || "",
         labelWidth,
@@ -572,7 +596,7 @@ const BLEPrinter = {
       RNBLEPrinter.printRawData(
         processedText.text,
         processedText.opts,
-        function (error) {
+        function (error: Error) {
           return console.warn(error);
         }
       );

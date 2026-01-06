@@ -35,7 +35,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * USB Printer Adapter for React Native Thermal Printer
+ * 
+ * Supports both ESC/POS and TSPL (TSC Printer Language) command formats.
+ * 
+ * For TSPL commands:
+ * - Use printRawData() with base64-encoded TSPL command strings
+ * - TSPL commands are text-based (e.g., "SIZE 35 mm, 22 mm\r\n")
+ * - Commands should be encoded as US_ASCII bytes before base64 encoding
+ * - Example TSPL command sequence:
+ *   "SIZE 35 mm, 22 mm\r\nGAP 2 mm, 0 mm\r\nCLS\r\nBITMAP 0,0,280,176,2,<binary data>\r\nPRINT 1,1\r\n"
+ * 
  * Created by xiesubin on 2017/9/20.
+ * Modified to support TSPL commands.
  */
 
 public class USBPrinterAdapter implements PrinterAdapter {
@@ -218,29 +230,88 @@ public class USBPrinterAdapter implements PrinterAdapter {
                 }
             }
         }
-        return true;
+        Log.e(LOG_TAG, "No suitable USB endpoint found");
+        return false;
     }
 
 
+    /**
+     * Print raw data (base64 encoded).
+     * Supports both ESC/POS and TSPL command formats.
+     * For TSPL commands, the data should be base64-encoded TSPL command strings (e.g., "SIZE 35 mm, 22 mm\r\n").
+     * 
+     * @param data Base64-encoded raw data (can be ESC/POS binary commands or TSPL text commands)
+     * @param errorCallback Error callback
+     */
     public void printRawData(String data, Callback errorCallback) {
         final String rawData = data;
-        Log.v(LOG_TAG, "start to print raw data " + data);
-        boolean isConnected = openConnection();
-        if (isConnected) {
-            Log.v(LOG_TAG, "Connected to device");
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    byte[] bytes = Base64.decode(rawData, Base64.DEFAULT);
-                    int b = mUsbDeviceConnection.bulkTransfer(mEndPoint, bytes, bytes.length, 100000);
-                    Log.i(LOG_TAG, "Return Status: b-->" + b);
-                }
-            }).start();
-        } else {
-            String msg = "failed to connected to device";
-            Log.v(LOG_TAG, msg);
-            errorCallback.invoke(msg);
+        Log.v(LOG_TAG, "start to print raw data (length: " + (rawData != null ? rawData.length() : 0) + ")");
+        
+        if (mUsbDeviceConnection == null || mEndPoint == null) {
+            boolean isConnected = openConnection();
+            if (!isConnected) {
+                String msg = "failed to connect to USB device";
+                Log.e(LOG_TAG, msg);
+                errorCallback.invoke(msg);
+                return;
+            }
         }
+        
+        final UsbDeviceConnection connection = mUsbDeviceConnection;
+        final UsbEndpoint endpoint = mEndPoint;
+        
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    byte[] bytes = Base64.decode(rawData, Base64.DEFAULT);
+                    if (bytes == null || bytes.length == 0) {
+                        Log.e(LOG_TAG, "Decoded data is empty");
+                        errorCallback.invoke("Decoded data is empty");
+                        return;
+                    }
+                    
+                    Log.d(LOG_TAG, "Sending " + bytes.length + " bytes to USB printer");
+                    
+                    // Send data in chunks if needed (some USB devices have max packet size limits)
+                    // For TSPL commands, this ensures reliable transmission of large command sequences
+                    int offset = 0;
+                    int chunkSize = 4096; // Common USB bulk transfer chunk size
+                    int timeout = 100000; // 100ms timeout
+                    
+                    while (offset < bytes.length) {
+                        int length = Math.min(chunkSize, bytes.length - offset);
+                        int result;
+                        
+                        // Use offset-based transfer if available (API 21+), otherwise copy to temp buffer
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                            result = connection.bulkTransfer(endpoint, bytes, offset, length, timeout);
+                        } else {
+                            // For older APIs, copy chunk to temporary buffer
+                            byte[] chunk = new byte[length];
+                            System.arraycopy(bytes, offset, chunk, 0, length);
+                            result = connection.bulkTransfer(endpoint, chunk, length, timeout);
+                        }
+                        
+                        if (result < 0) {
+                            String errorMsg = "USB bulk transfer failed with code: " + result;
+                            Log.e(LOG_TAG, errorMsg);
+                            errorCallback.invoke(errorMsg);
+                            return;
+                        }
+                        
+                        offset += length;
+                        Log.d(LOG_TAG, "Sent " + length + " bytes, total: " + offset + "/" + bytes.length);
+                    }
+                    
+                    Log.i(LOG_TAG, "Successfully sent " + bytes.length + " bytes to USB printer");
+                } catch (Exception e) {
+                    String errorMsg = "Failed to print raw data: " + e.getMessage();
+                    Log.e(LOG_TAG, errorMsg, e);
+                    errorCallback.invoke(errorMsg);
+                }
+            }
+        }).start();
     }
 
     public static Bitmap getBitmapFromURL(String src) {

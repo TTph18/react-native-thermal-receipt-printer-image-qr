@@ -227,18 +227,13 @@ RCT_EXPORT_METHOD(printImageBase64:(NSString *)base64Qr
             NSData *jpgData = UIImageJPEGRepresentation(srcImage, 1);
             UIImage *jpgImage = [[UIImage alloc] initWithData:jpgData];
             
-            NSInteger imgHeight = jpgImage.size.height;
-            NSInteger imagWidth = jpgImage.size.width;
-            NSInteger width = nWidth;
-            CGSize size = CGSizeMake(width, imgHeight*width/imagWidth);
-            UIImage *scaled = [RNNetPrinter imageWithImage:jpgImage scaledToFillSize:size];
-            
+            CGSize size = jpgImage.size;
+            UIImage *finalImage = jpgImage;
             if (paddingLeft > 0) {
-                scaled = [RNNetPrinter imagePadLeft:paddingLeft withSource:scaled];
-                size = [scaled size];
+                finalImage = [RNNetPrinter imagePadLeft:paddingLeft withSource:jpgImage];
+                size = [finalImage size];
             }
-            
-            unsigned char *graImage = [RNNetPrinter imageToGreyImage:scaled];
+            unsigned char *graImage = [RNNetPrinter imageToGreyImage:finalImage];
             unsigned char *formatedData = [RNNetPrinter format_K_threshold:graImage width:size.width height:size.height];
             NSData *dataToPrint = [RNNetPrinter eachLinePixToCmd:formatedData nWidth:size.width nHeight:size.height nMode:0];
             

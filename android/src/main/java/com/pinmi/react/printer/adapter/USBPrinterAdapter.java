@@ -92,11 +92,16 @@ public class USBPrinterAdapter implements PrinterAdapter {
                     UsbDevice usbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         assert usbDevice != null;
-                        Log.i(LOG_TAG, "success to grant permission for device " + usbDevice.getDeviceId() + ", vendor_id: " + usbDevice.getVendorId() + " product_id: " + usbDevice.getProductId());
+                        Log.i(LOG_TAG, "USB permission granted for device " + usbDevice.getDeviceId() + ", vendor_id: " + usbDevice.getVendorId() + " product_id: " + usbDevice.getProductId());
                         mUsbDevice = usbDevice;
+                        // Close any existing connection to ensure clean state
+                        closeConnectionIfExists();
+                        // Note: Connection will be established automatically on next printRawData call
                     } else {
                         assert usbDevice != null;
-                        Toast.makeText(context, "User refuses to obtain USB device permissions" + usbDevice.getDeviceName(), Toast.LENGTH_LONG).show();
+                        Log.w(LOG_TAG, "USB permission denied for device: " + usbDevice.getDeviceName());
+                        Toast.makeText(context, "USB permission denied. Please grant permission to use the printer.", Toast.LENGTH_LONG).show();
+                        mUsbDevice = null;
                     }
                 }
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
@@ -192,7 +197,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     private boolean openConnection() {
         if (mUsbDevice == null) {
-            Log.e(LOG_TAG, "USB Deivce is not initialized");
+            Log.e(LOG_TAG, "USB Device is not initialized");
             return false;
         }
         if (mUSBManager == null) {
@@ -200,38 +205,75 @@ public class USBPrinterAdapter implements PrinterAdapter {
             return false;
         }
 
+        // Check if connection already exists
         if (mUsbDeviceConnection != null) {
             Log.i(LOG_TAG, "USB Connection already connected");
             return true;
         }
 
-        UsbInterface usbInterface = mUsbDevice.getInterface(0);
-        for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
-            final UsbEndpoint ep = usbInterface.getEndpoint(i);
-            if (ep.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
-                if (ep.getDirection() == UsbConstants.USB_DIR_OUT) {
-                    UsbDeviceConnection usbDeviceConnection = mUSBManager.openDevice(mUsbDevice);
-                    if (usbDeviceConnection == null) {
-                        Log.e(LOG_TAG, "failed to open USB Connection");
-                        return false;
-                    }
-                    if (usbDeviceConnection.claimInterface(usbInterface, true)) {
+        // CRITICAL: Check if permission is granted before attempting to open device
+        if (!mUSBManager.hasPermission(mUsbDevice)) {
+            Log.e(LOG_TAG, "USB permission not granted for device. Requesting permission...");
+            // Request permission asynchronously
+            // Note: This will trigger the BroadcastReceiver which will set mUsbDevice
+            mUSBManager.requestPermission(mUsbDevice, mPermissionIndent);
+            return false;
+        }
 
-                        mEndPoint = ep;
-                        mUsbInterface = usbInterface;
-                        mUsbDeviceConnection = usbDeviceConnection;
-                        Log.i(LOG_TAG, "Device connected");
-                        return true;
-                    } else {
-                        usbDeviceConnection.close();
-                        Log.e(LOG_TAG, "failed to claim usb connection");
-                        return false;
+        // Verify device still exists in the device list
+        boolean deviceFound = false;
+        for (UsbDevice device : mUSBManager.getDeviceList().values()) {
+            if (device.getVendorId() == mUsbDevice.getVendorId() && 
+                device.getProductId() == mUsbDevice.getProductId()) {
+                deviceFound = true;
+                // Update reference to the current device instance
+                mUsbDevice = device;
+                break;
+            }
+        }
+        
+        if (!deviceFound) {
+            Log.e(LOG_TAG, "USB device no longer available (disconnected or removed)");
+            mUsbDevice = null;
+            return false;
+        }
+
+        try {
+            UsbInterface usbInterface = mUsbDevice.getInterface(0);
+            for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
+                final UsbEndpoint ep = usbInterface.getEndpoint(i);
+                if (ep.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                    if (ep.getDirection() == UsbConstants.USB_DIR_OUT) {
+                        UsbDeviceConnection usbDeviceConnection = mUSBManager.openDevice(mUsbDevice);
+                        if (usbDeviceConnection == null) {
+                            Log.e(LOG_TAG, "Failed to open USB connection - device may be restricted or in use");
+                            return false;
+                        }
+                        if (usbDeviceConnection.claimInterface(usbInterface, true)) {
+                            mEndPoint = ep;
+                            mUsbInterface = usbInterface;
+                            mUsbDeviceConnection = usbDeviceConnection;
+                            Log.i(LOG_TAG, "USB device connected successfully");
+                            return true;
+                        } else {
+                            usbDeviceConnection.close();
+                            Log.e(LOG_TAG, "Failed to claim USB interface - device may be in use by another application");
+                            return false;
+                        }
                     }
                 }
             }
+            Log.e(LOG_TAG, "No suitable USB endpoint found");
+            return false;
+        } catch (IllegalArgumentException e) {
+            Log.e(LOG_TAG, "USB device access error: " + e.getMessage(), e);
+            // Device might have been disconnected or permission revoked
+            mUsbDevice = null;
+            return false;
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "Unexpected error opening USB connection: " + e.getMessage(), e);
+            return false;
         }
-        Log.e(LOG_TAG, "No suitable USB endpoint found");
-        return false;
     }
 
 
@@ -248,9 +290,30 @@ public class USBPrinterAdapter implements PrinterAdapter {
         Log.v(LOG_TAG, "start to print raw data (length: " + (rawData != null ? rawData.length() : 0) + ")");
         
         if (mUsbDeviceConnection == null || mEndPoint == null) {
+            // Check if device is selected
+            if (mUsbDevice == null) {
+                String msg = "No USB device selected. Please select a device first.";
+                Log.e(LOG_TAG, msg);
+                errorCallback.invoke(msg);
+                return;
+            }
+            
+            // Check permission before attempting connection
+            if (mUSBManager != null && !mUSBManager.hasPermission(mUsbDevice)) {
+                String msg = "USB permission not granted. Please grant permission when prompted, then try again.";
+                Log.e(LOG_TAG, msg);
+                errorCallback.invoke(msg);
+                // Request permission
+                mUSBManager.requestPermission(mUsbDevice, mPermissionIndent);
+                return;
+            }
+            
             boolean isConnected = openConnection();
             if (!isConnected) {
-                String msg = "failed to connect to USB device";
+                String msg = "Failed to connect to USB device. Please ensure:\n" +
+                             "1. USB permission is granted\n" +
+                             "2. Device is connected and not in use by another app\n" +
+                             "3. Try disconnecting and reconnecting the device";
                 Log.e(LOG_TAG, msg);
                 errorCallback.invoke(msg);
                 return;
@@ -271,13 +334,72 @@ public class USBPrinterAdapter implements PrinterAdapter {
                         return;
                     }
                     
+                    // Debug: Always log command data for troubleshooting
+                    StringBuilder hexDump = new StringBuilder("Data (hex, first 100 bytes): ");
+                    int dumpLength = Math.min(bytes.length, 100);
+                    for (int i = 0; i < dumpLength; i++) {
+                        hexDump.append(String.format("%02X ", bytes[i] & 0xFF));
+                        if ((i + 1) % 16 == 0) hexDump.append("\n");
+                    }
+                    Log.d(LOG_TAG, hexDump.toString());
+                    
+                    // Detect command type: TSPL vs ESC/POS
+                    boolean isESCPOS = false;
+                    boolean isTSPL = false;
+                    
+                    // Check for ESC/POS commands (start with 0x1B ESC character)
+                    if (bytes.length > 0 && bytes[0] == 0x1B) {
+                        isESCPOS = true;
+                        Log.w(LOG_TAG, "WARNING: Detected ESC/POS commands, but printer expects TSPL commands!");
+                        Log.w(LOG_TAG, "ESC/POS commands will not work with TSPL printers. Use TSPL command format instead.");
+                    }
+                    
+                    // Also log as string if it's printable (for TSPL text commands)
+                    try {
+                        String asString = new String(bytes, "US-ASCII");
+                        // Check if it contains TSPL commands
+                        isTSPL = asString.contains("SIZE") || asString.contains("PRINT") || 
+                                 asString.contains("CLS") || asString.contains("BITMAP") ||
+                                 asString.contains("GAP") || asString.contains("REFERENCE");
+                        
+                        if (isTSPL) {
+                            // Replace control chars for readability
+                            String readable = asString.replace("\r", "\\r").replace("\n", "\\n");
+                            Log.d(LOG_TAG, "TSPL Data (text): " + readable);
+                            
+                            // Validate TSPL command structure
+                            if (!asString.contains("PRINT")) {
+                                Log.w(LOG_TAG, "WARNING: TSPL data does not contain PRINT command. Printer will not execute without PRINT.");
+                            }
+                            if (asString.contains("SIZE") && !asString.contains("CLS")) {
+                                Log.w(LOG_TAG, "WARNING: TSPL SIZE command found but CLS command missing. This may cause issues.");
+                            }
+                        } else if (asString.matches("^[\\x20-\\x7E\\r\\n\\t]+$") && !isESCPOS) {
+                            // Printable text but not TSPL
+                            String readable = asString.replace("\r", "\\r").replace("\n", "\\n");
+                            Log.d(LOG_TAG, "Data (text): " + readable);
+                            Log.w(LOG_TAG, "WARNING: Data appears to be plain text, not TSPL commands. Ensure TSPL commands are being sent.");
+                        }
+                    } catch (Exception e) {
+                        if (!isESCPOS) {
+                            Log.d(LOG_TAG, "Data is binary (likely BITMAP data for TSPL)");
+                        }
+                    }
+                    
+                    if (isESCPOS) {
+                        Log.e(LOG_TAG, "ERROR: ESC/POS commands detected. For TSPL printers, you must send TSPL text commands like:");
+                        Log.e(LOG_TAG, "  \"SIZE 35 mm, 22 mm\\r\\nGAP 2 mm, 0 mm\\r\\nCLS\\r\\nBITMAP 0,0,280,176,2,<data>\\r\\nPRINT 1,1\\r\\n\"");
+                        Log.e(LOG_TAG, "Ensure your Kotlin TsplCommandGenerator.generateLabelRetail() returns TSPL commands, not ESC/POS.");
+                    }
+                    
                     Log.d(LOG_TAG, "Sending " + bytes.length + " bytes to USB printer");
                     
                     // Send data in chunks if needed (some USB devices have max packet size limits)
-                    // For TSPL commands, this ensures reliable transmission of large command sequences
+                    // For TSPL commands, small commands (< 512 bytes) should be sent in one packet
+                    // to ensure command integrity
                     int offset = 0;
-                    int chunkSize = 4096; // Common USB bulk transfer chunk size
-                    int timeout = 100000; // 100ms timeout
+                    int chunkSize = bytes.length < 512 ? bytes.length : 4096; // Send small TSPL commands in one packet
+                    int timeout = 5000; // 5 seconds timeout for TSPL printers (increased from 100ms)
                     
                     while (offset < bytes.length) {
                         int length = Math.min(chunkSize, bytes.length - offset);
@@ -300,11 +422,49 @@ public class USBPrinterAdapter implements PrinterAdapter {
                             return;
                         }
                         
-                        offset += length;
-                        Log.d(LOG_TAG, "Sent " + length + " bytes, total: " + offset + "/" + bytes.length);
+                        // Verify actual bytes transferred
+                        if (result != length) {
+                            Log.w(LOG_TAG, "Partial transfer: requested " + length + " bytes, transferred " + result + " bytes");
+                            offset += result;
+                        } else {
+                            offset += length;
+                        }
+                        
+                        Log.d(LOG_TAG, "Sent " + result + " bytes, total: " + offset + "/" + bytes.length);
+                        
+                        // Small delay between chunks to ensure USB buffer is processed
+                        if (offset < bytes.length) {
+                            try {
+                                Thread.sleep(10); // 10ms delay between chunks
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                Log.w(LOG_TAG, "Transfer interrupted");
+                            }
+                        }
+                    }
+                    
+                    // Additional delay after sending all data to ensure printer processes TSPL commands
+                    // TSPL printers may need time to parse and execute commands, especially PRINT commands
+                    try {
+                        // Longer delay for TSPL printers to process PRINT command
+                        Thread.sleep(500); // 500ms delay for TSPL command processing
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
                     
                     Log.i(LOG_TAG, "Successfully sent " + bytes.length + " bytes to USB printer");
+                    
+                    // Verify the data contains TSPL PRINT command
+                    try {
+                        String dataStr = new String(bytes, "US-ASCII");
+                        if (dataStr.contains("PRINT")) {
+                            Log.d(LOG_TAG, "TSPL PRINT command detected in data");
+                        } else {
+                            Log.w(LOG_TAG, "WARNING: No PRINT command found in TSPL data. Printer may not execute without PRINT command.");
+                        }
+                    } catch (Exception e) {
+                        // Not ASCII, skip check
+                    }
                 } catch (Exception e) {
                     String errorMsg = "Failed to print raw data: " + e.getMessage();
                     Log.e(LOG_TAG, errorMsg, e);

@@ -287,7 +287,9 @@ const USBPrinter = {
    */
   printTSPLImageLabel: (
     base64Image: string | null,
-    printerWidth: number
+    printerWidth: number,
+    left: number = 0,
+    top: number = 0,
   ): void => {
     if (Platform.OS === "ios") {
       console.warn("TSPL printing not supported on iOS");
@@ -299,6 +301,8 @@ const USBPrinter = {
       RNUSBPrinter.printTSPLImageLabel(
         base64Image || "",
         printerWidth,
+        left,
+        top,
         (error: Error) => console.warn(error)
       );
     }

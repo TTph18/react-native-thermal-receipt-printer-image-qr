@@ -39,12 +39,12 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
     @Override
     public void init(Callback successCallback, Callback errorCallback) {
         this.adapter = USBPrinterAdapter.getInstance();
-        this.adapter.init(reactContext,  successCallback, errorCallback);
+        this.adapter.init(reactContext, successCallback, errorCallback);
     }
 
     @ReactMethod
     @Override
-    public void closeConn()  {
+    public void closeConn() {
         if (this.adapter == null) {
             this.adapter = USBPrinterAdapter.getInstance();
         }
@@ -53,29 +53,29 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
 
     @ReactMethod
     @Override
-    public void getDeviceList(Callback successCallback, Callback errorCallback)  {
+    public void getDeviceList(Callback successCallback, Callback errorCallback) {
         List<PrinterDevice> printerDevices = adapter.getDeviceList(errorCallback);
         WritableArray pairedDeviceList = Arguments.createArray();
-        if(printerDevices.size() > 0) {
+        if (printerDevices.size() > 0) {
             for (PrinterDevice printerDevice : printerDevices) {
                 pairedDeviceList.pushMap(printerDevice.toRNWritableMap());
             }
             successCallback.invoke(pairedDeviceList);
-        }else{
+        } else {
             errorCallback.invoke("No Device Found");
         }
     }
 
     @ReactMethod
     @Override
-    public void printRawData(String base64Data, Callback errorCallback){
+    public void printRawData(String base64Data, Callback errorCallback) {
         adapter.printRawData(base64Data, errorCallback);
     }
 
     @ReactMethod
     @Override
     public void printImageData(String imageUrl, int imageWidth, int imageHeight, Callback errorCallback) {
-        adapter.printImageData(imageUrl, imageWidth, imageHeight,errorCallback);
+        adapter.printImageData(imageUrl, imageWidth, imageHeight, errorCallback);
     }
 
     @ReactMethod
@@ -85,20 +85,22 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
         // String base64ImageProcessed = imageUrl.split(",")[1];
         byte[] decodedString = Base64.decode(base64, Base64.DEFAULT);
         Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
-        adapter.printImageBase64(decodedByte, imageWidth, imageHeight,errorCallback);
+        adapter.printImageBase64(decodedByte, imageWidth, imageHeight, errorCallback);
     }
 
     @ReactMethod
     public void connectPrinter(Integer vendorId, Integer productId, Callback successCallback, Callback errorCallback) {
         adapter.selectDevice(USBPrinterDeviceId.valueOf(vendorId, productId), successCallback, errorCallback);
     }
+
     /**
      * Encode TSPL command string to base64
-     * Use this if you're generating TSPL commands in Kotlin and just need to encode them
+     * Use this if you're generating TSPL commands in Kotlin and just need to encode
+     * them
      * 
-     * @param tsplCommand TSPL command string
+     * @param tsplCommand     TSPL command string
      * @param successCallback Returns base64-encoded TSPL commands
-     * @param errorCallback Error callback
+     * @param errorCallback   Error callback
      */
     @ReactMethod
     public void encodeTSPLCommand(String tsplCommand, Callback successCallback, Callback errorCallback) {
@@ -114,13 +116,13 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
      * Generate TSPL and print directly
      * Convenience method that generates TSPL command and prints it in one call
      * 
-     * @param width Label width in mm
-     * @param height Label height in mm
-     * @param gap Gap between labels in mm
-     * @param text Text to print
-     * @param x X position
-     * @param y Y position
-     * @param fontSize Font size (1-8)
+     * @param width         Label width in mm
+     * @param height        Label height in mm
+     * @param gap           Gap between labels in mm
+     * @param text          Text to print
+     * @param x             X position
+     * @param y             Y position
+     * @param fontSize      Font size (1-8)
      * @param errorCallback Error callback
      */
     @ReactMethod
@@ -132,40 +134,39 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
             int x,
             int y,
             int fontSize,
-            Callback errorCallback
-    ) {
+            Callback errorCallback) {
         try {
             String base64TSPL = TSPLCommandHelper.generateSimpleTextLabel(
-                    width, height, gap, text, x, y, fontSize
-            );
+                    width, height, gap, text, x, y, fontSize);
             adapter.printRawData(base64TSPL, errorCallback);
         } catch (Exception e) {
             errorCallback.invoke("Failed to generate or print TSPL command: " + e.getMessage());
         }
     }
+
     /**
      * Print image only with automatic size calculation based on printer width
      * This method calculates the image size based on printer width (58mm or 80mm)
      * and maintains aspect ratio automatically
      * 
-     * @param base64Image Base64-encoded image data
+     * @param base64Image    Base64-encoded image data
      * @param printerWidthMm Printer width in millimeters (58 or 80)
-     * @param errorCallback Error callback
+     * @param errorCallback  Error callback
      */
     @ReactMethod
-    public void printTSPLImageLabel(String base64Image, int printerWidth, Callback errorCallback) {
-        
+    public void printTSPLImageLabel(String base64Image, int printerWidth, int left, int top, Callback errorCallback) {
+
         byte[] decodedString = Base64.decode(base64Image, Base64.DEFAULT);
         Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
 
         if (this.adapter == null) {
             this.adapter = USBPrinterAdapter.getInstance();
         }
-        
+
         // Cast to USBPrinterAdapter to access the printTSPLImageLabel method
         if (this.adapter instanceof USBPrinterAdapter) {
             USBPrinterAdapter usbAdapter = (USBPrinterAdapter) this.adapter;
-            usbAdapter.printTSPLImageLabel(decodedByte, printerWidth, errorCallback);
+            usbAdapter.printTSPLImageLabel(decodedByte, printerWidth, left, top, errorCallback);
         } else {
             errorCallback.invoke("Adapter is not USBPrinterAdapter instance");
         }

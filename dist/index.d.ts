@@ -96,7 +96,7 @@ declare const USBPrinter: {
      * @param base64Image Base64-encoded image data (can be null/empty)
      * @param printerWidth Printer width in pixels (already converted from mm)
      */
-    printTSPLImageLabel: (base64Image: string | null, printerWidth: number) => void;
+    printTSPLImageLabel: (base64Image: string | null, printerWidth: number, left: number, top: number) => void;
     /**
      * `columnWidth`
      * 80mm => 46 character

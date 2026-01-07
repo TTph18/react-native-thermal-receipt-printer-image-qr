@@ -451,8 +451,10 @@ var USBPrinter = {
    * Print TSPL label with image, then print directly
    * @param base64Image Base64-encoded image data (can be null/empty)
    * @param printerWidth Printer width in pixels (already converted from mm)
+   * @param left Left position
+   * @param top Top position
    */
-  printTSPLImageLabel: function (base64Image, printerWidth) {
+  printTSPLImageLabel: function (base64Image, printerWidth, left, top) {
     if (Platform.OS === "ios") {
       console.warn("TSPL printing not supported on iOS");
     } else {
@@ -468,6 +470,8 @@ var USBPrinter = {
       RNUSBPrinter.printTSPLImageLabel(
         base64Image || "",
         printerWidth,
+        left,
+        top,
         function (error) {
           return console.warn(error);
         }

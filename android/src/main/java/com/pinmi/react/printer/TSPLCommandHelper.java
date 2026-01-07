@@ -109,15 +109,40 @@ public class TSPLCommandHelper {
         int widthBytes = (width + 7) / 8; // Round up to nearest byte
         byte[] data = new byte[widthBytes * height];
 
+        // First pass: Calculate average luminance (adaptive threshold) like UtilsImage
+        int grayTotal = 0;
+        int pixelCount = width * height;
+
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int pixel = bitmap.getPixel(x, y);
-                // Convert to grayscale and threshold
+                // Extract RGB values
                 int red = Color.red(pixel);
                 int green = Color.green(pixel);
                 int blue = Color.blue(pixel);
-                int luminance = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
-                boolean isBlack = luminance < 128;
+                // Convert to grayscale using standard luminance formula
+                int gray = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
+                grayTotal += gray;
+            }
+        }
+
+        // Calculate adaptive threshold (average luminance)
+        int threshold = grayTotal / pixelCount;
+
+        // Second pass: Apply threshold and convert to TSPL format
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = bitmap.getPixel(x, y);
+                // Extract RGB values
+                int red = Color.red(pixel);
+                int green = Color.green(pixel);
+                int blue = Color.blue(pixel);
+                // Convert to grayscale using standard luminance formula
+                int gray = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
+
+                // Use adaptive threshold: if gray > threshold, it's white, else black
+                // In TSPL: bit = 1 means print/black, bit = 0 means white
+                boolean isBlack = gray <= threshold;
 
                 if (isBlack) {
                     int byteIndex = (y * widthBytes) + (x / 8);
@@ -169,12 +194,12 @@ public class TSPLCommandHelper {
 
         // Calculate offset to center 28mm label within 108mm printable area
         // Center position = (108mm - 28mm) / 2 = 40mm = 320 pixels
-        double labelWidthDots = LABEL_WIDTH_MM * DOTS_PER_MM; // 28mm = 224 pixels
-        double maxWidthDots = MAX_PRINTER_WIDTH_MM * DOTS_PER_MM; // 108mm = 864 pixels
-        int centerOffset = (int) ((maxWidthDots - printerWidthPixels) / 2); // ~320 pixels
+        // double labelWidthDots = LABEL_WIDTH_MM * DOTS_PER_MM; // 28mm = 224 pixels
+        // double maxWidthDots = MAX_PRINTER_WIDTH_MM * DOTS_PER_MM; // 108mm = 864 pixels
+        // int centerOffset = (int) ((maxWidthDots - printerWidthPixels) / 2); // ~320 pixels
 
         // Position image at center offset + any additional x offset
-        int imageX = centerOffset + x;
+        int imageX = x;
         int imageY = y;
 
         // Convert bitmap to TSPL format
@@ -235,9 +260,9 @@ public class TSPLCommandHelper {
             double gap,
             Bitmap bitmap,
             int printerWidthPixels,
-            int x,
-            int y) {
-        ByteArrayOutputStream stream = generateImageLabelStream(gap, bitmap, printerWidthPixels, x, y);
+            int left,
+            int top) {
+        ByteArrayOutputStream stream = generateImageLabelStream(gap, bitmap, printerWidthPixels, left, top);
         if (stream == null) {
             return null;
         }

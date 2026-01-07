@@ -20,6 +20,14 @@ export interface PrinterImageOptions {
     printerWidthType?: PrinterWidth;
     paddingX?: number;
 }
+export interface TSPLImageLabelOptions {
+    gapMM?: number;
+    dotMM?: number;
+    printerWidthMM: number;
+    printerHeightMM?: number;
+    left?: number;
+    top?: number;
+}
 export interface IUSBPrinter {
     device_name: string;
     vendor_id: string;
@@ -93,10 +101,10 @@ declare const USBPrinter: {
     printTSPLTextLabel: (width: number, height: number, gap: number, text: string, x: number, y: number, fontSize: number) => void;
     /**
      * Print TSPL label with image, then print directly
-     * @param base64Image Base64-encoded image data (can be null/empty)
-     * @param printerWidth Printer width in pixels (already converted from mm)
+     * @param base64Image Base64-encoded image data
+     * @param options Configuration options for TSPL image label printing
      */
-    printTSPLImageLabel: (base64Image: string | null, printerWidth: number, left: number, top: number) => void;
+    printTSPLImageLabel: (base64Image: string | null, options: TSPLImageLabelOptions) => void;
     /**
      * `columnWidth`
      * 80mm => 46 character

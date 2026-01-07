@@ -12,6 +12,7 @@ import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableArray;
 import com.pinmi.react.printer.adapter.PrinterAdapter;
 import com.pinmi.react.printer.adapter.PrinterDevice;
@@ -149,26 +150,51 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
      * This method calculates the image size based on printer width (58mm or 80mm)
      * and maintains aspect ratio automatically
      * 
-     * @param base64Image    Base64-encoded image data
-     * @param printerWidthMm Printer width in millimeters (58 or 80)
-     * @param errorCallback  Error callback
+     * @param base64Image   Base64-encoded image data
+     * @param options       Options map containing:
+     *                      - gapMM (double): Gap between labels in mm
+     *                      - dotMM (double): Dots per mm
+     *                      - printerWidthMM (double): Printer width in mm
+     *                      - printerHeightMM (double): Printer height in mm
+     *                      - left (int): Left position in dots
+     *                      - top (int): Top position in dots
+     * @param errorCallback Error callback
      */
     @ReactMethod
-    public void printTSPLImageLabel(String base64Image, int printerWidth, int left, int top, Callback errorCallback) {
+    public void printTSPLImageLabel(String base64Image, ReadableMap options, Callback errorCallback) {
+        try {
+            // Extract options with defaults
+            double gapMM = options.hasKey("gapMM") ? options.getDouble("gapMM") : 2.0;
+            double dotMM = options.hasKey("dotMM") ? options.getDouble("dotMM") : 8.0;
+            double printerWidthMM = options.hasKey("printerWidthMM") ? options.getDouble("printerWidthMM") : 50.0;
+            double printerHeightMM = options.hasKey("printerHeightMM") ? options.getDouble("printerHeightMM") :40.0;
+            int left = options.hasKey("left") ? options.getInt("left") : 0;
+            int top = options.hasKey("top") ? options.getInt("top") : 0;
 
-        byte[] decodedString = Base64.decode(base64Image, Base64.DEFAULT);
-        Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+            // Decode base64 image
+            byte[] decodedString = Base64.decode(base64Image, Base64.DEFAULT);
+            Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
 
-        if (this.adapter == null) {
-            this.adapter = USBPrinterAdapter.getInstance();
-        }
+            if (decodedByte == null) {
+                errorCallback.invoke("Failed to decode base64 image");
+                return;
+            }
 
-        // Cast to USBPrinterAdapter to access the printTSPLImageLabel method
-        if (this.adapter instanceof USBPrinterAdapter) {
-            USBPrinterAdapter usbAdapter = (USBPrinterAdapter) this.adapter;
-            usbAdapter.printTSPLImageLabel(decodedByte, printerWidth, left, top, errorCallback);
-        } else {
-            errorCallback.invoke("Adapter is not USBPrinterAdapter instance");
+            // Initialize adapter if needed
+            if (this.adapter == null) {
+                this.adapter = USBPrinterAdapter.getInstance();
+            }
+
+            // Cast to USBPrinterAdapter to access the printTSPLImageLabel method
+            if (this.adapter instanceof USBPrinterAdapter) {
+                USBPrinterAdapter usbAdapter = (USBPrinterAdapter) this.adapter;
+                usbAdapter.printTSPLImageLabel(decodedByte, gapMM, dotMM, printerWidthMM, printerHeightMM, left, top,
+                        errorCallback);
+            } else {
+                errorCallback.invoke("Adapter is not USBPrinterAdapter instance");
+            }
+        } catch (Exception e) {
+            errorCallback.invoke("Failed to print TSPL image label: " + e.getMessage());
         }
     }
 

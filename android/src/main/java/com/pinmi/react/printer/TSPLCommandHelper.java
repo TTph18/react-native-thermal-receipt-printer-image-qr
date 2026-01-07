@@ -172,9 +172,11 @@ public class TSPLCommandHelper {
      *         bitmap data
      */
     public static ByteArrayOutputStream generateImageLabelStream(
-            double gap,
+            double gapMM,
+            double dotMM,
             Bitmap bitmap,
-            int printerWidthPixels,
+            double printerWidthMM,
+            double printerHeightMM,
             int x,
             int y) {
         if (bitmap == null) {
@@ -182,23 +184,10 @@ public class TSPLCommandHelper {
             return null;
         }
 
-        final double DOTS_PER_MM = 8.0;
-        final double MAX_PRINTER_WIDTH_MM = 108.0; // Printer max width
-        final double LABEL_WIDTH_MM = 28.0; // Actual label width is 28mm
-        int imgWidthDots = bitmap.getWidth();
-        int imgHeightDots = bitmap.getHeight();
-
         // Set SIZE to max printer width (108mm) to prevent auto-centering
-        double labelWidthMm = MAX_PRINTER_WIDTH_MM;
-        double labelHeightMm = imgHeightDots / DOTS_PER_MM;
+        double labelWidthMm = printerWidthMM;
+        double labelHeightMm = printerHeightMM;
 
-        // Calculate offset to center 28mm label within 108mm printable area
-        // Center position = (108mm - 28mm) / 2 = 40mm = 320 pixels
-        // double labelWidthDots = LABEL_WIDTH_MM * DOTS_PER_MM; // 28mm = 224 pixels
-        // double maxWidthDots = MAX_PRINTER_WIDTH_MM * DOTS_PER_MM; // 108mm = 864 pixels
-        // int centerOffset = (int) ((maxWidthDots - printerWidthPixels) / 2); // ~320 pixels
-
-        // Position image at center offset + any additional x offset
         int imageX = x;
         int imageY = y;
 
@@ -214,7 +203,7 @@ public class TSPLCommandHelper {
             // TSPL header commands (as ASCII)
             // SIZE should match printer width exactly
             String header = String.format("SIZE %.1f mm, %.1f mm\r\n", labelWidthMm, labelHeightMm) +
-                    String.format("GAP %.1f mm, 0 mm\r\n", gap) +
+                    String.format("GAP %.1f mm, 0 mm\r\n", gapMM) +
                     "CLS\r\n";
             stream.write(header.getBytes(StandardCharsets.US_ASCII));
 
@@ -230,11 +219,6 @@ public class TSPLCommandHelper {
             // Print command
             stream.write("\r\nPRINT 1,1\r\n".getBytes(StandardCharsets.US_ASCII));
 
-            Log.d(TAG, "Generated TSPL image label: SIZE=" + labelWidthMm + "x" + labelHeightMm + "mm, " +
-                    "image=" + imgWidthDots + "x" + imgHeightDots + " pixels, " +
-                    "position=(" + imageX + "," + imageY + "), " +
-                    "printerWidth=" + printerWidthPixels + " pixels (" + (printerWidthPixels / DOTS_PER_MM) + "mm), " +
-                    "data=" + bitmapBytes.length + " bytes");
         } catch (Exception e) {
             Log.e(TAG, "Error generating TSPL image label: " + e.getMessage());
             return null;
@@ -257,30 +241,18 @@ public class TSPLCommandHelper {
      * @return Base64-encoded TSPL commands with embedded binary bitmap data
      */
     public static String generateImageLabel(
-            double gap,
+            double gapMM,
+            double dotMM,
             Bitmap bitmap,
-            int printerWidthPixels,
+            double printerWidthMM,
+            double printerHeightMM,
             int left,
             int top) {
-        ByteArrayOutputStream stream = generateImageLabelStream(gap, bitmap, printerWidthPixels, left, top);
+        ByteArrayOutputStream stream = generateImageLabelStream(gapMM, dotMM, bitmap, printerWidthMM, printerHeightMM,
+                left, top);
         if (stream == null) {
             return null;
         }
         return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
-    }
-
-    /**
-     * Simple Triple class for returning multiple values
-     */
-    public static class Triple<A, B, C> {
-        public final A first;
-        public final B second;
-        public final C third;
-
-        public Triple(A first, B second, C third) {
-            this.first = first;
-            this.second = second;
-            this.third = third;
-        }
     }
 }

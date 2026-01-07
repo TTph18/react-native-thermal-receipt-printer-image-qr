@@ -619,7 +619,9 @@ public class USBPrinterAdapter implements PrinterAdapter {
      * @param printerWidth  Printer width in pixels (already converted from mm)
      * @param errorCallback Error callback
      */
-    public void printTSPLImageLabel(final Bitmap bitmapImage, int printerWidth, int left, int top,
+    public void printTSPLImageLabel(final Bitmap bitmapImage, double gapMM, double dotMM, double printerWidthMM,
+            double printerHeightMM, int left,
+            int top,
             Callback errorCallback) {
         if (bitmapImage == null) {
             errorCallback.invoke("bitmap image is null");
@@ -630,19 +632,20 @@ public class USBPrinterAdapter implements PrinterAdapter {
             Bitmap grayBitmap = toGrayscale(bitmapImage);
             // Use UtilsImage to resize the image to printer width (maintains aspect ratio)
             // printerWidth is already in pixels, height will be auto-calculated (0)
-            Bitmap resizedBitmap = resizeTheImageForPrinting(grayBitmap, printerWidth, 0);
+            double printerWidth = printerWidthMM / dotMM;
+            double printerHeight = printerHeightMM / dotMM;
+            Bitmap resizedBitmap = resizeTheImageForPrinting(grayBitmap, printerWidth, printerHeight);
 
             if (resizedBitmap == null) {
                 errorCallback.invoke("Failed to resize image");
                 return;
             }
             // Standard gap between labels
-            double gapMm = 2.0;
 
             // Generate TSPL commands with resized image
             // generateImageLabel will calculate mm from bitmap pixels automatically
             String base64TSPL = TSPLCommandHelper.generateImageLabel(
-                    gapMm, resizedBitmap, printerWidth, left, top);
+                    gapMM, dotMM, resizedBitmap, printerWidthMM, printerHeightMM, left, top);
 
             if (base64TSPL == null) {
                 errorCallback.invoke("Failed to generate TSPL image label");

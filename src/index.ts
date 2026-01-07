@@ -33,6 +33,15 @@ export interface PrinterImageOptions {
   paddingX?: number;
 }
 
+export interface TSPLImageLabelOptions {
+  gapMM?: number;
+  dotMM?: number;
+  printerWidthMM: number;
+  printerHeightMM?: number;
+  left?: number;
+  top?: number;
+}
+
 export interface IUSBPrinter {
   device_name: string;
   vendor_id: string;
@@ -282,30 +291,34 @@ const USBPrinter = {
   },
   /**
    * Print TSPL label with image, then print directly (all on Kotlin side)
-   * @param base64Image Base64-encoded image data (can be null/empty)
-   * @param printerWidth Printer width in pixels (already converted from mm)
+   * @param base64Image Base64-encoded image data
+   * @param options Configuration options for TSPL image label printing
    */
   printTSPLImageLabel: (
     base64Image: string | null,
-    printerWidth: number,
-    left: number = 0,
-    top: number = 0,
+    options: TSPLImageLabelOptions
   ): void => {
     if (Platform.OS === "ios") {
       console.warn("TSPL printing not supported on iOS");
-    } else {
-      if (!RNUSBPrinter || typeof RNUSBPrinter.printTSPLImageLabel !== "function") {
-        console.warn("printTSPLImageLabel is not available. Please rebuild the app after updating the native module.");
-        return;
-      }
-      RNUSBPrinter.printTSPLImageLabel(
-        base64Image || "",
-        printerWidth,
-        left,
-        top,
-        (error: Error) => console.warn(error)
-      );
+      return;
     }
+    
+    if (!RNUSBPrinter || typeof RNUSBPrinter.printTSPLImageLabel !== "function") {
+      console.warn("printTSPLImageLabel is not available. Please rebuild the app after updating the native module.");
+      return;
+    }
+
+    if (!base64Image) {
+      console.warn("base64Image is required for printTSPLImageLabel");
+      return;
+    }
+
+    // Call native method with options object
+    RNUSBPrinter.printTSPLImageLabel(
+      base64Image,
+      options,
+      (error: Error) => console.warn(error)
+    );
   },
   /**
    * `columnWidth`

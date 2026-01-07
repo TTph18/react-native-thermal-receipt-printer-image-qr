@@ -1,5 +1,6 @@
 package com.pinmi.react.printer;
-
+import static com.pinmi.react.printer.adapter.UtilsImage.getPixelsSlow;
+import static com.pinmi.react.printer.adapter.UtilsImage.recollectSlice;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.util.Base64;

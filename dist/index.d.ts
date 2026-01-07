@@ -73,18 +73,6 @@ declare const USBPrinter: {
      */
     printTSPL: (base64TSPLCommands: string) => void;
     /**
-     * Generate TSPL command for simple text label (generated on Kotlin side)
-     * @param width Label width in mm
-     * @param height Label height in mm
-     * @param gap Gap between labels in mm
-     * @param text Text to print
-     * @param x X position
-     * @param y Y position
-     * @param fontSize Font size (1-8)
-     * @returns Promise<string> Base64-encoded TSPL commands
-     */
-    generateTSPLTextLabel: (width: number, height: number, gap: number, text: string, x: number, y: number, fontSize: number) => Promise<string>;
-    /**
      * Encode TSPL command string to base64 (generated on Kotlin side)
      * Use this if you're generating TSPL commands in Kotlin and just need to encode them
      * @param tsplCommand TSPL command string
@@ -104,44 +92,11 @@ declare const USBPrinter: {
      */
     printTSPLTextLabel: (width: number, height: number, gap: number, text: string, x: number, y: number, fontSize: number) => void;
     /**
-     * Generate TSPL label with image from base64 image data (generated on Kotlin side)
-     * Image dimensions are automatically detected. Label size is auto-calculated if width/height are 0.
-     * @param base64Image Base64-encoded image data
-     * @param labelWidth Label width in mm (0 = auto-calculate from image)
-     * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap Gap between labels in mm
-     * @param x X position for image
-     * @param y Y position for image
-     * @returns Promise<string> Base64-encoded TSPL commands
-     */
-    generateTSPLImageLabel: (base64Image: string, labelWidth: number, labelHeight: number, gap: number, x: number, y: number) => Promise<string>;
-    /**
-     * Generate TSPL label with image from image URL (generated on Kotlin side)
-     * Image dimensions are automatically detected. Label size is auto-calculated if width/height are 0.
-     * @param imageUrl URL of the image
-     * @param labelWidth Label width in mm (0 = auto-calculate from image)
-     * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap Gap between labels in mm
-     * @param x X position for image
-     * @param y Y position for image
-     * @returns Promise<string> Base64-encoded TSPL commands
-     */
-    generateTSPLImageLabelFromURL: (imageUrl: string, labelWidth: number, labelHeight: number, gap: number, x: number, y: number) => Promise<string>;
-    /**
-     * Generate TSPL label with image and text, then print directly (all on Kotlin side)
-     * Image dimensions are automatically detected. Label size is auto-calculated if width/height are 0.
+     * Print TSPL label with image, then print directly
      * @param base64Image Base64-encoded image data (can be null/empty)
-     * @param labelWidth Label width in mm (0 = auto-calculate from image)
-     * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap Gap between labels in mm
-     * @param imageX X position for image
-     * @param imageY Y position for image
-     * @param text Text to print (can be null/empty)
-     * @param textX X position for text
-     * @param textY Y position for text
-     * @param fontSize Font size (1-8)
+     * @param printerWidth Printer width in pixels (already converted from mm)
      */
-    printTSPLImageLabel: (base64Image: string | null, labelWidth: number, labelHeight: number, gap: number, imageX: number, imageY: number, text: string | null, textX: number, textY: number, fontSize: number) => void;
+    printTSPLImageLabel: (base64Image: string | null, printerWidth: number) => void;
     /**
      * `columnWidth`
      * 80mm => 46 character

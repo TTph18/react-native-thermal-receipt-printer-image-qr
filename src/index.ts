@@ -217,48 +217,7 @@ const USBPrinter = {
       RNUSBPrinter.printRawData(base64TSPLCommands, (error: Error) => console.warn(error));
     }
   },
-  /**
-   * Generate TSPL command for simple text label (generated on Kotlin side)
-   * @param width Label width in mm
-   * @param height Label height in mm
-   * @param gap Gap between labels in mm
-   * @param text Text to print
-   * @param x X position
-   * @param y Y position
-   * @param fontSize Font size (1-8)
-   * @returns Promise<string> Base64-encoded TSPL commands
-   */
-  generateTSPLTextLabel: (
-    width: number,
-    height: number,
-    gap: number,
-    text: string,
-    x: number,
-    y: number,
-    fontSize: number
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (Platform.OS === "ios") {
-        reject(new Error("TSPL printing not supported on iOS"));
-        return;
-      }
-      if (!RNUSBPrinter || typeof RNUSBPrinter.generateTSPLTextLabel !== "function") {
-        reject(new Error("generateTSPLTextLabel is not available. Please rebuild the app after updating the native module."));
-        return;
-      }
-      RNUSBPrinter.generateTSPLTextLabel(
-        width,
-        height,
-        gap,
-        text,
-        x,
-        y,
-        fontSize,
-        (base64: string) => resolve(base64),
-        (error: Error) => reject(error)
-      );
-    });
-  },
+
   /**
    * Encode TSPL command string to base64 (generated on Kotlin side)
    * Use this if you're generating TSPL commands in Kotlin and just need to encode them
@@ -322,110 +281,13 @@ const USBPrinter = {
     }
   },
   /**
-   * Generate TSPL label with image from base64 image data (generated on Kotlin side)
-   * Image dimensions are automatically detected. Label size is auto-calculated if width/height are 0.
-   * @param base64Image Base64-encoded image data
-   * @param labelWidth Label width in mm (0 = auto-calculate from image)
-   * @param labelHeight Label height in mm (0 = auto-calculate from image)
-   * @param gap Gap between labels in mm
-   * @param x X position for image
-   * @param y Y position for image
-   * @returns Promise<string> Base64-encoded TSPL commands
-   */
-  generateTSPLImageLabel: (
-    base64Image: string,
-    labelWidth: number,
-    labelHeight: number,
-    gap: number,
-    x: number,
-    y: number
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (Platform.OS === "ios") {
-        reject(new Error("TSPL printing not supported on iOS"));
-        return;
-      }
-      if (!RNUSBPrinter || typeof RNUSBPrinter.generateTSPLImageLabel !== "function") {
-        reject(new Error("generateTSPLImageLabel is not available. Please rebuild the app after updating the native module."));
-        return;
-      }
-      RNUSBPrinter.generateTSPLImageLabel(
-        base64Image,
-        labelWidth,
-        labelHeight,
-        gap,
-        x,
-        y,
-        (base64: string) => resolve(base64),
-        (error: Error) => reject(error)
-      );
-    });
-  },
-  /**
-   * Generate TSPL label with image from image URL (generated on Kotlin side)
-   * Image dimensions are automatically detected. Label size is auto-calculated if width/height are 0.
-   * @param imageUrl URL of the image
-   * @param labelWidth Label width in mm (0 = auto-calculate from image)
-   * @param labelHeight Label height in mm (0 = auto-calculate from image)
-   * @param gap Gap between labels in mm
-   * @param x X position for image
-   * @param y Y position for image
-   * @returns Promise<string> Base64-encoded TSPL commands
-   */
-  generateTSPLImageLabelFromURL: (
-    imageUrl: string,
-    labelWidth: number,
-    labelHeight: number,
-    gap: number,
-    x: number,
-    y: number
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (Platform.OS === "ios") {
-        reject(new Error("TSPL printing not supported on iOS"));
-        return;
-      }
-      if (!RNUSBPrinter || typeof RNUSBPrinter.generateTSPLImageLabelFromURL !== "function") {
-        reject(new Error("generateTSPLImageLabelFromURL is not available. Please rebuild the app after updating the native module."));
-        return;
-      }
-      RNUSBPrinter.generateTSPLImageLabelFromURL(
-        imageUrl,
-        labelWidth,
-        labelHeight,
-        gap,
-        x,
-        y,
-        (base64: string) => resolve(base64),
-        (error: Error) => reject(error)
-      );
-    });
-  },
-  /**
-   * Generate TSPL label with image and text, then print directly (all on Kotlin side)
-   * Image dimensions are automatically detected. Label size is auto-calculated if width/height are 0.
+   * Print TSPL label with image, then print directly (all on Kotlin side)
    * @param base64Image Base64-encoded image data (can be null/empty)
-   * @param labelWidth Label width in mm (0 = auto-calculate from image)
-   * @param labelHeight Label height in mm (0 = auto-calculate from image)
-   * @param gap Gap between labels in mm
-   * @param imageX X position for image
-   * @param imageY Y position for image
-   * @param text Text to print (can be null/empty)
-   * @param textX X position for text
-   * @param textY Y position for text
-   * @param fontSize Font size (1-8)
+   * @param printerWidth Printer width in pixels (already converted from mm)
    */
   printTSPLImageLabel: (
     base64Image: string | null,
-    labelWidth: number,
-    labelHeight: number,
-    gap: number,
-    imageX: number,
-    imageY: number,
-    text: string | null,
-    textX: number,
-    textY: number,
-    fontSize: number
+    printerWidth: number
   ): void => {
     if (Platform.OS === "ios") {
       console.warn("TSPL printing not supported on iOS");
@@ -436,15 +298,7 @@ const USBPrinter = {
       }
       RNUSBPrinter.printTSPLImageLabel(
         base64Image || "",
-        labelWidth,
-        labelHeight,
-        gap,
-        imageX,
-        imageY,
-        text || "",
-        textX,
-        textY,
-        fontSize,
+        printerWidth,
         (error: Error) => console.warn(error)
       );
     }

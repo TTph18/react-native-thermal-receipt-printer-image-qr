@@ -18,50 +18,52 @@ public class TSPLCommandHelper {
     /**
      * Generate a simple TSPL text label command
      * 
-     * @param width Label width in mm
-     * @param height Label height in mm
-     * @param gap Gap between labels in mm
-     * @param text Text to print
-     * @param x X position
-     * @param y Y position
+     * @param width    Label width in mm
+     * @param height   Label height in mm
+     * @param gap      Gap between labels in mm
+     * @param text     Text to print
+     * @param x        X position
+     * @param y        Y position
      * @param fontSize Font size (1-8)
      * @return Base64-encoded TSPL commands
      */
     public static String generateSimpleTextLabel(
-            double width, 
-            double height, 
+            double width,
+            double height,
             double gap,
             String text,
             int x,
             int y,
-            int fontSize
-    ) {
+            int fontSize) {
         StringBuilder tspl = new StringBuilder();
-        
+
         // TSPL header commands
         tspl.append(String.format("SIZE %.1f mm, %.1f mm\r\n", width, height));
         tspl.append(String.format("GAP %.1f mm, 0 mm\r\n", gap));
         tspl.append("CLS\r\n");
-        
-        // Text command: TEXT x,y,"font",rotation,x-multiplication,y-multiplication,"content"
-        // Font: "1"=8x12, "2"=12x20, "3"=16x24, "4"=24x32, "5"=32x48, "6"=14x19, "7"=21x27, "8"=14x25
+
+        // Text command: TEXT
+        // x,y,"font",rotation,x-multiplication,y-multiplication,"content"
+        // Font: "1"=8x12, "2"=12x20, "3"=16x24, "4"=24x32, "5"=32x48, "6"=14x19,
+        // "7"=21x27, "8"=14x25
         tspl.append(String.format("TEXT %d,%d,\"%d\",0,1,1,\"%s\"\r\n", x, y, fontSize, text));
-        
+
         // Print command
         tspl.append("PRINT 1,1\r\n");
-        
+
         // Convert to base64
         byte[] tsplBytes = tspl.toString().getBytes(StandardCharsets.US_ASCII);
         String base64 = Base64.encodeToString(tsplBytes, Base64.NO_WRAP);
-        
+
         Log.d(TAG, "Generated TSPL command: " + tspl.toString().replace("\r\n", "\\r\\n"));
-        
+
         return base64;
     }
 
     /**
      * Convert TSPL command string to base64
-     * Use this if you're generating TSPL commands in Kotlin and just need to encode them
+     * Use this if you're generating TSPL commands in Kotlin and just need to encode
+     * them
      * 
      * @param tsplCommand TSPL command string (e.g., "SIZE 35 mm, 22 mm\r\n...")
      * @return Base64-encoded TSPL commands
@@ -73,13 +75,16 @@ public class TSPLCommandHelper {
 
     /**
      * Generate TSPL command from Kotlin TsplCommandGenerator
-     * This method can be called from your app's Kotlin code via reflection or direct call
+     * This method can be called from your app's Kotlin code via reflection or
+     * direct call
      * 
      * Example usage in your Kotlin code:
      * ```kotlin
      * val tsplGenerator = TsplCommandGenerator()
-     * val tsplCommands = tsplGenerator.generateLabelRetail(context, printer, sysFlags, labels)
-     * val base64 = TSPLCommandHelper.encodeTSPLCommand(String(tsplCommands, Charsets.US_ASCII))
+     * val tsplCommands = tsplGenerator.generateLabelRetail(context, printer,
+     * sysFlags, labels)
+     * val base64 = TSPLCommandHelper.encodeTSPLCommand(String(tsplCommands,
+     * Charsets.US_ASCII))
      * ```
      * 
      * @param tsplCommandBytes ByteArray from Kotlin TsplCommandGenerator
@@ -109,13 +114,13 @@ public class TSPLCommandHelper {
                 int red = Color.red(pixel);
                 int green = Color.green(pixel);
                 int blue = Color.blue(pixel);
-                int luminance = (int)(0.299 * red + 0.587 * green + 0.114 * blue);
+                int luminance = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
                 boolean isBlack = luminance < 128;
 
                 if (isBlack) {
                     int byteIndex = (y * widthBytes) + (x / 8);
                     int bitIndex = 7 - (x % 8); // MSB first
-                    data[byteIndex] = (byte)(data[byteIndex] | (1 << bitIndex));
+                    data[byteIndex] = (byte) (data[byteIndex] | (1 << bitIndex));
                 }
             }
         }
@@ -125,38 +130,36 @@ public class TSPLCommandHelper {
 
     /**
      * Generate TSPL label with image (BITMAP command)
-     * Returns ByteArrayOutputStream that contains both text commands and binary bitmap data
-     * Label size is automatically calculated from image dimensions if width/height are 0
+     * Returns ByteArrayOutputStream that contains both text commands and binary
+     * bitmap data
+     * Label size is automatically calculated from image dimensions if width/height
+     * are 0
      * 
-     * @param labelWidth Label width in mm (0 = auto-calculate from image)
+     * @param labelWidth  Label width in mm (0 = auto-calculate from image)
      * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap Gap between labels in mm
-     * @param bitmap Bitmap image to print
-     * @param x X position for image
-     * @param y Y position for image
-     * @return ByteArrayOutputStream containing TSPL commands with embedded binary bitmap data
+     * @param gap         Gap between labels in mm
+     * @param bitmap      Bitmap image to print
+     * @param x           X position for image
+     * @param y           Y position for image
+     * @return ByteArrayOutputStream containing TSPL commands with embedded binary
+     *         bitmap data
      */
     public static ByteArrayOutputStream generateImageLabelStream(
-            double labelWidth,
-            double labelHeight,
             double gap,
             Bitmap bitmap,
             int x,
-            int y
-    ) {
+            int y) {
         if (bitmap == null) {
             Log.e(TAG, "Bitmap is null");
             return null;
         }
 
-        // Calculate label size from image if not provided
-        // Assuming 203 DPI (8 dots per mm)
         final double DOTS_PER_MM = 8.0;
         int imgWidthDots = bitmap.getWidth();
         int imgHeightDots = bitmap.getHeight();
-        
-        double calculatedWidth = labelWidth > 0 ? labelWidth : (imgWidthDots / DOTS_PER_MM) + 2; // Add 2mm margin
-        double calculatedHeight = labelHeight > 0 ? labelHeight : (imgHeightDots / DOTS_PER_MM) + 2; // Add 2mm margin
+
+        double calculatedWidth = (imgWidthDots / DOTS_PER_MM) + 2; // Add 2mm margin
+        double calculatedHeight = (imgHeightDots / DOTS_PER_MM) + 2; // Add 2mm margin
 
         // Convert bitmap to TSPL format
         Triple<Integer, Integer, byte[]> bitmapData = bitmapToTsplData(bitmap);
@@ -165,45 +168,46 @@ public class TSPLCommandHelper {
         byte[] bitmapBytes = bitmapData.third;
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        
+
         try {
             // TSPL header commands (as ASCII)
             String header = String.format("SIZE %.1f mm, %.1f mm\r\n", calculatedWidth, calculatedHeight) +
-                           String.format("GAP %.1f mm, 0 mm\r\n", gap) +
-                           "CLS\r\n";
+                    String.format("GAP %.1f mm, 0 mm\r\n", gap) +
+                    "CLS\r\n";
             stream.write(header.getBytes(StandardCharsets.US_ASCII));
-            
+
             // BITMAP command: BITMAP x,y,width_bytes,height,type,
             // type: 0=normal, 1=mirror, 2=upside down, 3=mirror+upside down
             String bitmapCmd = String.format("BITMAP %d,%d,%d,%d,2,", x, y, widthBytes, imgHeight);
             stream.write(bitmapCmd.getBytes(StandardCharsets.US_ASCII));
-            
+
             // Write binary bitmap data directly
             stream.write(bitmapBytes);
-            
+
             // Print command
             stream.write("\r\nPRINT 1,1\r\n".getBytes(StandardCharsets.US_ASCII));
-            
-            Log.d(TAG, "Generated TSPL image label: " + calculatedWidth + "x" + calculatedHeight + "mm, " + 
-                  bitmapBytes.length + " bytes bitmap data");
+
+            Log.d(TAG, "Generated TSPL image label: " + calculatedWidth + "x" + calculatedHeight + "mm, " +
+                    bitmapBytes.length + " bytes bitmap data");
         } catch (Exception e) {
             Log.e(TAG, "Error generating TSPL image label: " + e.getMessage());
             return null;
         }
-        
+
         return stream;
     }
 
     /**
      * Generate TSPL label with image (BITMAP command) - returns base64
-     * Label size is automatically calculated from image dimensions if width/height are 0
+     * Label size is automatically calculated from image dimensions if width/height
+     * are 0
      * 
-     * @param labelWidth Label width in mm (0 = auto-calculate from image)
+     * @param labelWidth  Label width in mm (0 = auto-calculate from image)
      * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap Gap between labels in mm
-     * @param bitmap Bitmap image to print
-     * @param x X position for image
-     * @param y Y position for image
+     * @param gap         Gap between labels in mm
+     * @param bitmap      Bitmap image to print
+     * @param x           X position for image
+     * @param y           Y position for image
      * @return Base64-encoded TSPL commands with embedded binary bitmap data
      */
     public static String generateImageLabel(
@@ -212,8 +216,7 @@ public class TSPLCommandHelper {
             double gap,
             Bitmap bitmap,
             int x,
-            int y
-    ) {
+            int y) {
         ByteArrayOutputStream stream = generateImageLabelStream(labelWidth, labelHeight, gap, bitmap, x, y);
         if (stream == null) {
             return null;
@@ -225,16 +228,16 @@ public class TSPLCommandHelper {
      * Generate TSPL label with both text and image
      * Label size is automatically calculated from image dimensions if not provided
      * 
-     * @param labelWidth Label width in mm (0 = auto-calculate from image)
+     * @param labelWidth  Label width in mm (0 = auto-calculate from image)
      * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap Gap between labels in mm
-     * @param bitmap Bitmap image to print (can be null)
-     * @param imageX X position for image
-     * @param imageY Y position for image
-     * @param text Text to print (can be null)
-     * @param textX X position for text
-     * @param textY Y position for text
-     * @param fontSize Font size (1-8)
+     * @param gap         Gap between labels in mm
+     * @param bitmap      Bitmap image to print (can be null)
+     * @param imageX      X position for image
+     * @param imageY      Y position for image
+     * @param text        Text to print (can be null)
+     * @param textX       X position for text
+     * @param textY       Y position for text
+     * @param fontSize    Font size (1-8)
      * @return Base64-encoded TSPL commands with embedded binary bitmap data
      */
     public static String generateLabelWithImageAndText(
@@ -247,13 +250,13 @@ public class TSPLCommandHelper {
             String text,
             int textX,
             int textY,
-            int fontSize
-    ) {
+            int fontSize) {
         // Calculate label size from image if not provided
         final double DOTS_PER_MM = 8.0;
         double calculatedWidth = labelWidth;
         double calculatedHeight = labelHeight;
-        
+
+        int[][] pixels = getPixelsSlow(bitmap, labelWidth, imageHeight);
         if (bitmap != null && (labelWidth <= 0 || labelHeight <= 0)) {
             int imgWidthDots = bitmap.getWidth();
             int imgHeightDots = bitmap.getHeight();
@@ -264,48 +267,50 @@ public class TSPLCommandHelper {
                 calculatedHeight = (imgHeightDots / DOTS_PER_MM) + 2; // Add 2mm margin
             }
         }
-        
+
         // Default size if no image and no size provided
-        if (calculatedWidth <= 0) calculatedWidth = 50.0;
-        if (calculatedHeight <= 0) calculatedHeight = 30.0;
-        
+        if (calculatedWidth <= 0)
+            calculatedWidth = 50.0;
+        if (calculatedHeight <= 0)
+            calculatedHeight = 30.0;
+
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        
+
         try {
             // TSPL header commands
             String header = String.format("SIZE %.1f mm, %.1f mm\r\n", calculatedWidth, calculatedHeight) +
-                           String.format("GAP %.1f mm, 0 mm\r\n", gap) +
-                           "CLS\r\n";
+                    String.format("GAP %.1f mm, 0 mm\r\n", gap) +
+                    "CLS\r\n";
             stream.write(header.getBytes(StandardCharsets.US_ASCII));
-            
+
             // Add image if provided
             if (bitmap != null) {
                 Triple<Integer, Integer, byte[]> bitmapData = bitmapToTsplData(bitmap);
                 int widthBytes = bitmapData.first;
                 int imgHeight = bitmapData.second;
                 byte[] bitmapBytes = bitmapData.third;
-                
-                String bitmapCmd = String.format("BITMAP %d,%d,%d,%d,2,", 
+
+                String bitmapCmd = String.format("BITMAP %d,%d,%d,%d,2,",
                         imageX, imageY, widthBytes, imgHeight);
                 stream.write(bitmapCmd.getBytes(StandardCharsets.US_ASCII));
                 stream.write(bitmapBytes); // Write binary data directly
                 stream.write("\r\n".getBytes(StandardCharsets.US_ASCII));
             }
-            
+
             // Add text if provided
             if (text != null && !text.isEmpty()) {
-                String textCmd = String.format("TEXT %d,%d,\"%d\",0,1,1,\"%s\"\r\n", 
+                String textCmd = String.format("TEXT %d,%d,\"%d\",0,1,1,\"%s\"\r\n",
                         textX, textY, fontSize, text);
                 stream.write(textCmd.getBytes(StandardCharsets.US_ASCII));
             }
-            
+
             // Print command
             stream.write("PRINT 1,1\r\n".getBytes(StandardCharsets.US_ASCII));
         } catch (Exception e) {
             Log.e(TAG, "Error generating TSPL label with image and text: " + e.getMessage());
             return null;
         }
-        
+
         return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
     }
 
@@ -324,4 +329,3 @@ public class TSPLCommandHelper {
         }
     }
 }
-

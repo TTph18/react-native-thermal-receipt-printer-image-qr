@@ -632,8 +632,8 @@ public class USBPrinterAdapter implements PrinterAdapter {
             Bitmap grayBitmap = toGrayscale(bitmapImage);
             // Use UtilsImage to resize the image to printer width (maintains aspect ratio)
             // printerWidth is already in pixels, height will be auto-calculated (0)
-            double printerWidth = printerWidthMM / dotMM;
-            double printerHeight = printerHeightMM / dotMM;
+            double printerWidth = (int) (printerWidthMM * dotMM);
+            double printerHeight = (int) (printerHeightMM * dotMM);
             Bitmap resizedBitmap = resizeTheImageForPrinting(grayBitmap, printerWidth, printerHeight);
 
             if (resizedBitmap == null) {

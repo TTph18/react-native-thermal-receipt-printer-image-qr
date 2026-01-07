@@ -3,6 +3,7 @@ package com.pinmi.react.printer.adapter;
 import static com.pinmi.react.printer.adapter.UtilsImage.getPixelsSlow;
 import static com.pinmi.react.printer.adapter.UtilsImage.recollectSlice;
 import static com.pinmi.react.printer.adapter.UtilsImage.resizeTheImageForPrinting;
+import static com.pinmi.react.printer.adapter.UtilsImage.toGrayscale;
 
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
@@ -625,9 +626,10 @@ public class USBPrinterAdapter implements PrinterAdapter {
         }
 
         try {
+            Bitmap grayBitmap = toGrayscale(bitmapImage);
             // Use UtilsImage to resize the image to printer width (maintains aspect ratio)
             // printerWidth is already in pixels, height will be auto-calculated (0)
-            Bitmap resizedBitmap = resizeTheImageForPrinting(bitmapImage, printerWidth, 0);
+            Bitmap resizedBitmap = resizeTheImageForPrinting(grayBitmap, printerWidth, 0);
 
             if (resizedBitmap == null) {
                 errorCallback.invoke("Failed to resize image");
@@ -639,7 +641,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
             // Generate TSPL commands with resized image
             // generateImageLabel will calculate mm from bitmap pixels automatically
             String base64TSPL = TSPLCommandHelper.generateImageLabel(
-                    gapMm, resizedBitmap, 0, 0);
+                    gapMm, resizedBitmap, printerWidth, 0, 0);
 
             if (base64TSPL == null) {
                 errorCallback.invoke("Failed to generate TSPL image label");

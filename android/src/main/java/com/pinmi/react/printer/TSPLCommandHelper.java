@@ -1,4 +1,5 @@
 package com.pinmi.react.printer;
+
 import static com.pinmi.react.printer.adapter.UtilsImage.getPixelsSlow;
 import static com.pinmi.react.printer.adapter.UtilsImage.recollectSlice;
 import android.graphics.Bitmap;
@@ -148,6 +149,7 @@ public class TSPLCommandHelper {
     public static ByteArrayOutputStream generateImageLabelStream(
             double gap,
             Bitmap bitmap,
+            int printerWidthPixels,
             int x,
             int y) {
         if (bitmap == null) {
@@ -156,11 +158,24 @@ public class TSPLCommandHelper {
         }
 
         final double DOTS_PER_MM = 8.0;
+        final double MAX_PRINTER_WIDTH_MM = 108.0; // Printer max width
+        final double LABEL_WIDTH_MM = 28.0; // Actual label width is 28mm
         int imgWidthDots = bitmap.getWidth();
         int imgHeightDots = bitmap.getHeight();
 
-        double calculatedWidth = (imgWidthDots / DOTS_PER_MM) + 2; // Add 2mm margin
-        double calculatedHeight = (imgHeightDots / DOTS_PER_MM) + 2; // Add 2mm margin
+        // Set SIZE to max printer width (108mm) to prevent auto-centering
+        double labelWidthMm = MAX_PRINTER_WIDTH_MM;
+        double labelHeightMm = imgHeightDots / DOTS_PER_MM;
+
+        // Calculate offset to center 28mm label within 108mm printable area
+        // Center position = (108mm - 28mm) / 2 = 40mm = 320 pixels
+        double labelWidthDots = LABEL_WIDTH_MM * DOTS_PER_MM; // 28mm = 224 pixels
+        double maxWidthDots = MAX_PRINTER_WIDTH_MM * DOTS_PER_MM; // 108mm = 864 pixels
+        int centerOffset = (int) ((maxWidthDots - printerWidthPixels) / 2); // ~320 pixels
+
+        // Position image at center offset + any additional x offset
+        int imageX = centerOffset + x;
+        int imageY = y;
 
         // Convert bitmap to TSPL format
         Triple<Integer, Integer, byte[]> bitmapData = bitmapToTsplData(bitmap);
@@ -172,14 +187,16 @@ public class TSPLCommandHelper {
 
         try {
             // TSPL header commands (as ASCII)
-            String header = String.format("SIZE %.1f mm, %.1f mm\r\n", calculatedWidth, calculatedHeight) +
+            // SIZE should match printer width exactly
+            String header = String.format("SIZE %.1f mm, %.1f mm\r\n", labelWidthMm, labelHeightMm) +
                     String.format("GAP %.1f mm, 0 mm\r\n", gap) +
                     "CLS\r\n";
             stream.write(header.getBytes(StandardCharsets.US_ASCII));
 
             // BITMAP command: BITMAP x,y,width_bytes,height,type,
             // type: 0=normal, 1=mirror, 2=upside down, 3=mirror+upside down
-            String bitmapCmd = String.format("BITMAP %d,%d,%d,%d,2,", x, y, widthBytes, imgHeight);
+            // Use calculated imageX which centers the image
+            String bitmapCmd = String.format("BITMAP %d,%d,%d,%d,2,", imageX, imageY, widthBytes, imgHeight);
             stream.write(bitmapCmd.getBytes(StandardCharsets.US_ASCII));
 
             // Write binary bitmap data directly
@@ -188,8 +205,11 @@ public class TSPLCommandHelper {
             // Print command
             stream.write("\r\nPRINT 1,1\r\n".getBytes(StandardCharsets.US_ASCII));
 
-            Log.d(TAG, "Generated TSPL image label: " + calculatedWidth + "x" + calculatedHeight + "mm, " +
-                    bitmapBytes.length + " bytes bitmap data");
+            Log.d(TAG, "Generated TSPL image label: SIZE=" + labelWidthMm + "x" + labelHeightMm + "mm, " +
+                    "image=" + imgWidthDots + "x" + imgHeightDots + " pixels, " +
+                    "position=(" + imageX + "," + imageY + "), " +
+                    "printerWidth=" + printerWidthPixels + " pixels (" + (printerWidthPixels / DOTS_PER_MM) + "mm), " +
+                    "data=" + bitmapBytes.length + " bytes");
         } catch (Exception e) {
             Log.e(TAG, "Error generating TSPL image label: " + e.getMessage());
             return null;
@@ -214,14 +234,16 @@ public class TSPLCommandHelper {
     public static String generateImageLabel(
             double gap,
             Bitmap bitmap,
+            int printerWidthPixels,
             int x,
             int y) {
-        ByteArrayOutputStream stream = generateImageLabelStream(gap, bitmap, x, y);
+        ByteArrayOutputStream stream = generateImageLabelStream(gap, bitmap, printerWidthPixels, x, y);
         if (stream == null) {
             return null;
         }
         return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
     }
+
     /**
      * Simple Triple class for returning multiple values
      */

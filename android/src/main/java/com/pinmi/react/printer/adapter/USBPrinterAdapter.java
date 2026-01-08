@@ -619,8 +619,8 @@ public class USBPrinterAdapter implements PrinterAdapter {
      * @param printerWidth  Printer width in pixels (already converted from mm)
      * @param errorCallback Error callback
      */
-    public void printTSPLImageLabel(final Bitmap bitmapImage, double gapMM, double dotMM, double printerWidthMM,
-            double printerHeightMM, int left,
+    public void printTSPLImageLabel(final Bitmap bitmapImage, int gapMM, int dotMM, int printerWidthMM,
+            int printerHeightMM, int left,
             int top,
             Callback errorCallback) {
         if (bitmapImage == null) {
@@ -632,8 +632,8 @@ public class USBPrinterAdapter implements PrinterAdapter {
             Bitmap grayBitmap = toGrayscale(bitmapImage);
             // Use UtilsImage to resize the image to printer width (maintains aspect ratio)
             // printerWidth is already in pixels, height will be auto-calculated (0)
-            int printerWidth = (int) (printerWidthMM * dotMM);
-            int printerHeight = (int) (printerHeightMM * dotMM);
+            int printerWidth = printerWidthMM * dotMM;
+            int printerHeight = printerHeightMM * dotMM;
             Bitmap resizedBitmap = resizeTheImageForPrinting(grayBitmap, printerWidth, 0);
 
             if (resizedBitmap == null) {

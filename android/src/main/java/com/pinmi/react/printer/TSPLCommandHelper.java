@@ -172,11 +172,11 @@ public class TSPLCommandHelper {
      *         bitmap data
      */
     public static ByteArrayOutputStream generateImageLabelStream(
-            double gapMM,
-            double dotMM,
+            int gapMM,
+            int dotMM,
             Bitmap bitmap,
-            double printerWidthMM,
-            double printerHeightMM,
+            int printerWidthMM,
+            int printerHeightMM,
             int x,
             int y) {
         if (bitmap == null) {
@@ -241,11 +241,11 @@ public class TSPLCommandHelper {
      * @return Base64-encoded TSPL commands with embedded binary bitmap data
      */
     public static String generateImageLabel(
-            double gapMM,
-            double dotMM,
+            int gapMM,
+            int dotMM,
             Bitmap bitmap,
-            double printerWidthMM,
-            double printerHeightMM,
+            int printerWidthMM,
+            int printerHeightMM,
             int left,
             int top) {
         ByteArrayOutputStream stream = generateImageLabelStream(gapMM, dotMM, bitmap, printerWidthMM, printerHeightMM,

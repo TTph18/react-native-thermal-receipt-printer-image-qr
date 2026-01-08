@@ -24,7 +24,7 @@ export interface TSPLImageLabelOptions {
     gapMM?: number;
     dotMM?: number;
     printerWidthMM: number;
-    printerHeightMM?: number;
+    printerHeightMM: number;
     left?: number;
     top?: number;
 }

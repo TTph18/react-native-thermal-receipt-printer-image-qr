@@ -170,6 +170,7 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
             int printerHeightMM = options.hasKey("printerHeightMM") ? options.getInt("printerHeightMM") : 30;
             int left = options.hasKey("left") ? options.getInt("left") : 0;
             int top = options.hasKey("top") ? options.getInt("top") : 0;
+            boolean invert = options.hasKey("invert") ? options.getBoolean("invert") : false;
 
             // Decode base64 image
             byte[] decodedString = Base64.decode(base64Image, Base64.DEFAULT);
@@ -189,7 +190,7 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
             if (this.adapter instanceof USBPrinterAdapter) {
                 USBPrinterAdapter usbAdapter = (USBPrinterAdapter) this.adapter;
                 usbAdapter.printTSPLImageLabel(decodedByte, gapMM, dotMM, printerWidthMM, printerHeightMM,
-                        left, top,
+                        left, top, invert,
                         errorCallback);
             } else {
                 errorCallback.invoke("Adapter is not USBPrinterAdapter instance");

@@ -101,33 +101,14 @@ public class TSPLCommandHelper {
      * TSPL BITMAP format: Each byte represents 8 pixels (MSB first)
      * 
      * @param bitmap Bitmap to convert (will be converted to monochrome)
+     * @param invert If true, invert the bitmap colors (for printers that interpret bit=1 as white)
      * @return Triple of (widthBytes, height, bitmapData)
      */
-    public static Triple<Integer, Integer, byte[]> bitmapToTsplData(Bitmap bitmap) {
+    public static Triple<Integer, Integer, byte[]> bitmapToTsplData(Bitmap bitmap, boolean invert) {
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
         int widthBytes = (width + 7) / 8; // Round up to nearest byte
         byte[] data = new byte[widthBytes * height];
-
-        // First pass: Calculate average luminance (adaptive threshold) like UtilsImage
-        int grayTotal = 0;
-        int pixelCount = width * height;
-
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int pixel = bitmap.getPixel(x, y);
-                // Extract RGB values
-                int red = Color.red(pixel);
-                int green = Color.green(pixel);
-                int blue = Color.blue(pixel);
-                // Convert to grayscale using standard luminance formula
-                int gray = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
-                grayTotal += gray;
-            }
-        }
-
-        // Calculate adaptive threshold (average luminance)
-        int threshold = grayTotal / pixelCount;
 
         // Second pass: Apply threshold and convert to TSPL format
         for (int y = 0; y < height; y++) {
@@ -140,9 +121,11 @@ public class TSPLCommandHelper {
                 // Convert to grayscale using standard luminance formula
                 int gray = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
 
-                // Use adaptive threshold: if gray > threshold, it's white, else black
-                // In TSPL: bit = 1 means print/black, bit = 0 means white
-                boolean isBlack = gray <= threshold;
+                boolean isBlack = gray < 128;
+                // Apply inversion if needed
+                if (invert) {
+                    isBlack = !isBlack;
+                }
 
                 if (isBlack) {
                     int byteIndex = (y * widthBytes) + (x / 8);
@@ -155,30 +138,15 @@ public class TSPLCommandHelper {
         return new Triple<>(widthBytes, height, data);
     }
 
-    /**
-     * Generate TSPL label with image (BITMAP command)
-     * Returns ByteArrayOutputStream that contains both text commands and binary
-     * bitmap data
-     * Label size is automatically calculated from image dimensions if width/height
-     * are 0
-     * 
-     * @param labelWidth  Label width in mm (0 = auto-calculate from image)
-     * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap         Gap between labels in mm
-     * @param bitmap      Bitmap image to print
-     * @param x           X position for image
-     * @param y           Y position for image
-     * @return ByteArrayOutputStream containing TSPL commands with embedded binary
-     *         bitmap data
-     */
-    public static ByteArrayOutputStream generateImageLabelStream(
+    public static String generateImageLabel(
             int gapMM,
             int dotMM,
             Bitmap bitmap,
             int printerWidthMM,
             int printerHeightMM,
             int x,
-            int y) {
+            int y,
+            boolean invert) {
         if (bitmap == null) {
             Log.e(TAG, "Bitmap is null");
             return null;
@@ -192,9 +160,10 @@ public class TSPLCommandHelper {
         int imageY = y;
 
         // Convert bitmap to TSPL format
-        Triple<Integer, Integer, byte[]> bitmapData = bitmapToTsplData(bitmap);
+        Triple<Integer, Integer, byte[]> bitmapData = bitmapToTsplData(bitmap, invert);
         int widthBytes = bitmapData.first;
-        int imgHeight = bitmapData.second;
+        int imgWidth = bitmap.getWidth();
+        int imgHeight = bitmap.getHeight();
         byte[] bitmapBytes = bitmapData.third;
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
@@ -219,40 +188,16 @@ public class TSPLCommandHelper {
             // Print command
             stream.write("\r\nPRINT 1,1\r\n".getBytes(StandardCharsets.US_ASCII));
 
+            Log.d(TAG, "Generated TSPL image label: SIZE=" + labelWidthMm + "x" + labelHeightMm + "mm, " +
+                    "image=" + imgWidth + "x" + imgHeight + " pixels, " +
+                    "position=(" + imageX + "," + imageY + "), " +
+                    "printerWidth=" + printerWidthMM + " dots (" + (printerWidthMM * dotMM) + " ), " +
+                    "data=" + bitmapBytes.length + " bytes");
         } catch (Exception e) {
             Log.e(TAG, "Error generating TSPL image label: " + e.getMessage());
             return null;
         }
 
-        return stream;
-    }
-
-    /**
-     * Generate TSPL label with image (BITMAP command) - returns base64
-     * Label size is automatically calculated from image dimensions if width/height
-     * are 0
-     * 
-     * @param labelWidth  Label width in mm (0 = auto-calculate from image)
-     * @param labelHeight Label height in mm (0 = auto-calculate from image)
-     * @param gap         Gap between labels in mm
-     * @param bitmap      Bitmap image to print
-     * @param x           X position for image
-     * @param y           Y position for image
-     * @return Base64-encoded TSPL commands with embedded binary bitmap data
-     */
-    public static String generateImageLabel(
-            int gapMM,
-            int dotMM,
-            Bitmap bitmap,
-            int printerWidthMM,
-            int printerHeightMM,
-            int left,
-            int top) {
-        ByteArrayOutputStream stream = generateImageLabelStream(gapMM, dotMM, bitmap, printerWidthMM, printerHeightMM,
-                left, top);
-        if (stream == null) {
-            return null;
-        }
         return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
     }
 

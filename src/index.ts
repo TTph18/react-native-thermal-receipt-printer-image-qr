@@ -40,6 +40,7 @@ export interface TSPLImageLabelOptions {
   printerHeightMM?: number;
   left?: number;
   top?: number;
+  invert?: boolean; // If true, invert bitmap colors (for printers that interpret bit=1 as white instead of black)
 }
 
 export interface IUSBPrinter {

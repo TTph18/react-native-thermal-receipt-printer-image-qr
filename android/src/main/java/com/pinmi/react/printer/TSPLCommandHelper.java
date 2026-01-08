@@ -185,8 +185,8 @@ public class TSPLCommandHelper {
         }
 
         // Set SIZE to max printer width (108mm) to prevent auto-centering
-        double labelWidthMm = printerWidthMM;
-        double labelHeightMm = printerHeightMM;
+        int labelWidthMm = printerWidthMM;
+        int labelHeightMm = printerHeightMM;
 
         int imageX = x;
         int imageY = y;
@@ -202,8 +202,8 @@ public class TSPLCommandHelper {
         try {
             // TSPL header commands (as ASCII)
             // SIZE should match printer width exactly
-            String header = String.format("SIZE %.1f mm, %.1f mm\r\n", labelWidthMm, labelHeightMm) +
-                    String.format("GAP %.1f mm, 0 mm\r\n", gapMM) +
+            String header = String.format("SIZE %d mm, %d mm\r\n", labelWidthMm, labelHeightMm) +
+                    String.format("GAP %d mm, 0 mm\r\n", gapMM) +
                     "CLS\r\n";
             stream.write(header.getBytes(StandardCharsets.US_ASCII));
 

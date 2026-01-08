@@ -164,10 +164,10 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
     public void printTSPLImageLabel(String base64Image, ReadableMap options, Callback errorCallback) {
         try {
             // Extract options with defaults
-            double gapMM = options.hasKey("gapMM") ? options.getDouble("gapMM") : 2.0;
-            double dotMM = options.hasKey("dotMM") ? options.getDouble("dotMM") : 8.0;
-            double printerWidthMM = options.hasKey("printerWidthMM") ? options.getDouble("printerWidthMM") : 50.0;
-            double printerHeightMM = options.hasKey("printerHeightMM") ? options.getDouble("printerHeightMM") :40.0;
+            int gapMM = options.hasKey("gapMM") ? options.getInt("gapMM") : 2;
+            int dotMM = options.hasKey("dotMM") ? options.getInt("dotMM") : 8;
+            int printerWidthMM = options.hasKey("printerWidthMM") ? options.getInt("printerWidthMM") : 50;
+            int printerHeightMM = options.hasKey("printerHeightMM") ? options.getInt("printerHeightMM") : 30;
             int left = options.hasKey("left") ? options.getInt("left") : 0;
             int top = options.hasKey("top") ? options.getInt("top") : 0;
 
@@ -188,7 +188,8 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
             // Cast to USBPrinterAdapter to access the printTSPLImageLabel method
             if (this.adapter instanceof USBPrinterAdapter) {
                 USBPrinterAdapter usbAdapter = (USBPrinterAdapter) this.adapter;
-                usbAdapter.printTSPLImageLabel(decodedByte, gapMM, dotMM, printerWidthMM, printerHeightMM, left, top,
+                usbAdapter.printTSPLImageLabel(decodedByte, gapMM, dotMM, printerWidthMM, printerHeightMM,
+                        left, top,
                         errorCallback);
             } else {
                 errorCallback.invoke("Adapter is not USBPrinterAdapter instance");

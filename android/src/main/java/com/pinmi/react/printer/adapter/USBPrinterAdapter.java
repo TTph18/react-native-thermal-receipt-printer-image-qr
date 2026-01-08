@@ -634,7 +634,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
             // printerWidth is already in pixels, height will be auto-calculated (0)
             int printerWidth = (int) (printerWidthMM * dotMM);
             int printerHeight = (int) (printerHeightMM * dotMM);
-            Bitmap resizedBitmap = resizeTheImageForPrinting(grayBitmap, printerWidth, printerHeight);
+            Bitmap resizedBitmap = resizeTheImageForPrinting(grayBitmap, printerWidth, 0);
 
             if (resizedBitmap == null) {
                 errorCallback.invoke("Failed to resize image");

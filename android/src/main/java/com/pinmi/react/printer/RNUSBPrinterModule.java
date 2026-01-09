@@ -82,8 +82,8 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
     @ReactMethod
     @Override
     public void printImageBase64(String base64, int imageWidth, int imageHeight, Callback errorCallback) {
-        // Call overloaded method with default values: x=-1 (center align), y=0
-        printImageBase64(base64, imageWidth, imageHeight, -1, 0, errorCallback);
+        // Call method with positioning using default values: x=-1 (center align), y=0
+        printImageBase64WithPosition(base64, imageWidth, imageHeight, -1, 0, errorCallback);
     }
 
     /**

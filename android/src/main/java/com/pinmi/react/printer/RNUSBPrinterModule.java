@@ -87,12 +87,12 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
     }
 
     /**
-     * Overloaded method with x, y positioning for USB printers
+     * Method with x, y positioning for USB printers
      * x: Default -1 = center align, 0 = left align, > 0 = absolute position in dots
      * y: Default 0 = top, vertical position in dots (approximate 24 dots per line)
      */
     @ReactMethod
-    public void printImageBase64(String base64, int imageWidth, int imageHeight, int x, int y, Callback errorCallback) {
+    public void printImageBase64WithPosition(String base64, int imageWidth, int imageHeight, int x, int y, Callback errorCallback) {
         // String imageBase64 = "data:image/png;base64," + imageUrl;
         // String base64ImageProcessed = imageUrl.split(",")[1];
         byte[] decodedString = Base64.decode(base64, Base64.DEFAULT);

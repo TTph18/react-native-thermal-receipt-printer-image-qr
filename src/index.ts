@@ -195,15 +195,26 @@ const USBPrinter = {
         console.warn(error)
       );
     } else {
-      // USB printer supports x, y positioning
-      RNUSBPrinter.printImageBase64(
-        Base64,
-        opts?.imageWidth ?? 0,
-        opts?.imageHeight ?? 0,
-        opts?.x ?? -1, // Default: -1 = center align, 0 = left align, > 0 = absolute position
-        opts?.y ?? 0,  // Default: 0 = top
-        (error: Error) => console.warn(error)
-      );
+      // USB printer supports x, y positioning - use separate method name for React Native
+      if (opts?.x !== undefined || opts?.y !== undefined) {
+        // Use the method with positioning if x or y is provided
+        RNUSBPrinter.printImageBase64WithPosition(
+          Base64,
+          opts?.imageWidth ?? 0,
+          opts?.imageHeight ?? 0,
+          opts?.x ?? -1, // Default: -1 = center align, 0 = left align, > 0 = absolute position
+          opts?.y ?? 0,  // Default: 0 = top
+          (error: Error) => console.warn(error)
+        );
+      } else {
+        // Use the standard method if no positioning is needed
+        RNUSBPrinter.printImageBase64(
+          Base64,
+          opts?.imageWidth ?? 0,
+          opts?.imageHeight ?? 0,
+          (error: Error) => console.warn(error)
+        );
+      }
     }
   },
   /**

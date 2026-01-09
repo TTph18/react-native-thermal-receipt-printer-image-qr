@@ -328,29 +328,48 @@ var USBPrinter = {
         return console.warn(error);
       });
     } else {
-      // USB printer supports x, y positioning
-      RNUSBPrinter.printImageBase64(
-        Base64,
-        (_a = opts === null || opts === void 0 ? void 0 : opts.imageWidth) !==
-          null && _a !== void 0
-          ? _a
-          : 0,
-        (_b = opts === null || opts === void 0 ? void 0 : opts.imageHeight) !==
-          null && _b !== void 0
-          ? _b
-          : 0,
-        (_c = opts === null || opts === void 0 ? void 0 : opts.x) !==
-          null && _c !== void 0
-          ? _c
-          : -1,
-        (_d = opts === null || opts === void 0 ? void 0 : opts.y) !==
-          null && _d !== void 0
-          ? _d
-          : 0,
-        function (error) {
-          return console.warn(error);
-        }
-      );
+      // USB printer supports x, y positioning - use separate method name for React Native
+      if (opts.x !== undefined || opts.y !== undefined) {
+        // Use the method with positioning if x or y is provided
+        RNUSBPrinter.printImageBase64WithPosition(
+          Base64,
+          (_a = opts === null || opts === void 0 ? void 0 : opts.imageWidth) !==
+            null && _a !== void 0
+            ? _a
+            : 0,
+          (_b = opts === null || opts === void 0 ? void 0 : opts.imageHeight) !==
+            null && _b !== void 0
+            ? _b
+            : 0,
+          (_c = opts === null || opts === void 0 ? void 0 : opts.x) !==
+            null && _c !== void 0
+            ? _c
+            : -1,
+          (_d = opts === null || opts === void 0 ? void 0 : opts.y) !==
+            null && _d !== void 0
+            ? _d
+            : 0,
+          function (error) {
+            return console.warn(error);
+          }
+        );
+      } else {
+        // Use the standard method if no positioning is needed
+        RNUSBPrinter.printImageBase64(
+          Base64,
+          (_a = opts === null || opts === void 0 ? void 0 : opts.imageWidth) !==
+            null && _a !== void 0
+            ? _a
+            : 0,
+          (_b = opts === null || opts === void 0 ? void 0 : opts.imageHeight) !==
+            null && _b !== void 0
+            ? _b
+            : 0,
+          function (error) {
+            return console.warn(error);
+          }
+        );
+      }
     }
   },
   /**

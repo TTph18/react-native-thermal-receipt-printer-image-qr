@@ -97,7 +97,13 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
         // String base64ImageProcessed = imageUrl.split(",")[1];
         byte[] decodedString = Base64.decode(base64, Base64.DEFAULT);
         Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
-        adapter.printImageBase64(decodedByte, imageWidth, imageHeight, x, y, errorCallback);
+        // Cast to USBPrinterAdapter to access the overloaded method with x, y parameters
+        if (adapter instanceof USBPrinterAdapter) {
+            ((USBPrinterAdapter) adapter).printImageBase64(decodedByte, imageWidth, imageHeight, x, y, errorCallback);
+        } else {
+            // Fallback to interface method if cast fails (shouldn't happen)
+            adapter.printImageBase64(decodedByte, imageWidth, imageHeight, errorCallback);
+        }
     }
 
     @ReactMethod

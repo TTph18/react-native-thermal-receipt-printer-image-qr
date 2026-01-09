@@ -28,6 +28,8 @@ export interface PrinterImageOptions {
   encoding?: string;
   imageWidth?: number;
   imageHeight?: number;
+  x?: number; // X position in dots (USB printer only: default -1 = center align, 0 = left align, > 0 = absolute position)
+  y?: number; // Y position in dots (USB printer only: default 0 = top, approximate 24 dots per line)
   printerWidthType?: PrinterWidth;
   // only ios
   paddingX?: number;
@@ -193,10 +195,13 @@ const USBPrinter = {
         console.warn(error)
       );
     } else {
+      // USB printer supports x, y positioning
       RNUSBPrinter.printImageBase64(
         Base64,
         opts?.imageWidth ?? 0,
         opts?.imageHeight ?? 0,
+        opts?.x ?? -1, // Default: -1 = center align, 0 = left align, > 0 = absolute position
+        opts?.y ?? 0,  // Default: 0 = top
         (error: Error) => console.warn(error)
       );
     }

@@ -17,6 +17,8 @@ export interface PrinterImageOptions {
     encoding?: string;
     imageWidth?: number;
     imageHeight?: number;
+    x?: number;
+    y?: number;
     printerWidthType?: PrinterWidth;
     paddingX?: number;
 }

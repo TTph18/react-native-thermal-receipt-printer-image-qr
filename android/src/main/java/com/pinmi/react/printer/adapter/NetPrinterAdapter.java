@@ -282,8 +282,6 @@ public class NetPrinterAdapter implements PrinterAdapter {
             printerOutputStream.write(CENTER_ALIGN);
 
             for (int y = 0; y < pixels.length; y += 24) {
-                // Like I said before, when done sending data,
-                // the printer will resume to normal text printing
                 printerOutputStream.write(SELECT_BIT_IMAGE_MODE);
                 // Set nL and nH based on the width of the image
                 printerOutputStream.write(new byte[]{(byte) (0x00ff & pixels[y].length)
@@ -329,8 +327,6 @@ public class NetPrinterAdapter implements PrinterAdapter {
             printerOutputStream.write(CENTER_ALIGN);
 
             for (int y = 0; y < pixels.length; y += 24) {
-                // Like I said before, when done sending data,
-                // the printer will resume to normal text printing
                 printerOutputStream.write(SELECT_BIT_IMAGE_MODE);
                 // Set nL and nH based on the width of the image
                 printerOutputStream.write(new byte[]{(byte) (0x00ff & pixels[y].length)

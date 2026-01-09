@@ -319,7 +319,7 @@ var USBPrinter = {
    * @param opts
    */
   printImageBase64: function (Base64, opts) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     if (opts === void 0) {
       opts = {};
     }
@@ -328,6 +328,7 @@ var USBPrinter = {
         return console.warn(error);
       });
     } else {
+      // USB printer supports x, y positioning
       RNUSBPrinter.printImageBase64(
         Base64,
         (_a = opts === null || opts === void 0 ? void 0 : opts.imageWidth) !==
@@ -337,6 +338,14 @@ var USBPrinter = {
         (_b = opts === null || opts === void 0 ? void 0 : opts.imageHeight) !==
           null && _b !== void 0
           ? _b
+          : 0,
+        (_c = opts === null || opts === void 0 ? void 0 : opts.x) !==
+          null && _c !== void 0
+          ? _c
+          : -1,
+        (_d = opts === null || opts === void 0 ? void 0 : opts.y) !==
+          null && _d !== void 0
+          ? _d
           : 0,
         function (error) {
           return console.warn(error);

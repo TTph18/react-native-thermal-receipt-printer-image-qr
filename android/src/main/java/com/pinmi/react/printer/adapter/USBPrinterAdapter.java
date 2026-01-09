@@ -531,8 +531,6 @@ public class USBPrinterAdapter implements PrinterAdapter {
             b = mUsbDeviceConnection.bulkTransfer(mEndPoint, CENTER_ALIGN, CENTER_ALIGN.length, 100000);
 
             for (int y = 0; y < pixels.length; y += 24) {
-                // Like I said before, when done sending data,
-                // the printer will resume to normal text printing
                 mUsbDeviceConnection.bulkTransfer(mEndPoint, SELECT_BIT_IMAGE_MODE, SELECT_BIT_IMAGE_MODE.length,
                         100000);
 
@@ -564,6 +562,16 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     @Override
     public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, Callback errorCallback) {
+        // Call overloaded method with default values: x=-1 (center align), y=0
+        printImageBase64(bitmapImage, imageWidth, imageHeight, -1, 0, errorCallback);
+    }
+
+    /**
+     * Overloaded method with x, y positioning for USB printers
+     * x: Default -1 = center align, 0 = left align, > 0 = absolute position in dots
+     * y: Default 0 = top, vertical position in dots (approximate 24 dots per line)
+     */
+    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, int x, int y, Callback errorCallback) {
         if (bitmapImage == null) {
             errorCallback.invoke("image not found");
             return;
@@ -576,23 +584,53 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
             int b = mUsbDeviceConnection.bulkTransfer(mEndPoint, SET_LINE_SPACE_24, SET_LINE_SPACE_24.length, 100000);
 
-            b = mUsbDeviceConnection.bulkTransfer(mEndPoint, CENTER_ALIGN, CENTER_ALIGN.length, 100000);
+            // Calculate image width in dots (pixels)
+            int imageWidthDots = pixels.length > 0 ? pixels[0].length : imageWidth;
+            
+            // Set absolute print position based on x parameter
+            // ESC/POS bit images don't respect text alignment, so we must use ESC $ (set absolute position)
+            int absoluteX = 0;
+            if (x == 0) {
+                // Left align: position at 0
+                absoluteX = 0;
+            } else if (x < 0) {
+                // Center align: calculate center position
+                // Default printer width: 384 dots (58mm) or 576 dots (80mm)
+                // Try to detect from image width: if image is close to 384, assume 58mm printer
+                int printerWidth = (imageWidthDots <= 400) ? 384 : 576;
+                absoluteX = (printerWidth - imageWidthDots) / 2;
+                if (absoluteX < 0) absoluteX = 0;
+            } else {
+                // Absolute position: use x value directly
+                absoluteX = x;
+            }
+            
+            // ESC $ nL nH: Set absolute print position
+            // n = absoluteX position in dots, nL = low byte, nH = high byte
+            byte[] setAbsolutePosition = { 0x1B, 0x24, (byte)(absoluteX & 0xFF), (byte)((absoluteX >> 8) & 0xFF) };
+            b = mUsbDeviceConnection.bulkTransfer(mEndPoint, setAbsolutePosition, setAbsolutePosition.length, 100000);
 
-            for (int y = 0; y < pixels.length; y += 24) {
-                // Like I said before, when done sending data,
-                // the printer will resume to normal text printing
+            // Move to y position using line feeds (y is in dots, approximate 24 dots per line)
+            if (y > 0) {
+                int linesToFeed = y / 24;
+                for (int i = 0; i < linesToFeed; i++) {
+                    mUsbDeviceConnection.bulkTransfer(mEndPoint, LINE_FEED, LINE_FEED.length, 100000);
+                }
+            }
+
+            for (int rowIdx = 0; rowIdx < pixels.length; rowIdx += 24) {
                 mUsbDeviceConnection.bulkTransfer(mEndPoint, SELECT_BIT_IMAGE_MODE, SELECT_BIT_IMAGE_MODE.length,
                         100000);
 
                 // Set nL and nH based on the width of the image
-                byte[] row = new byte[] { (byte) (0x00ff & pixels[y].length),
-                        (byte) ((0xff00 & pixels[y].length) >> 8) };
+                byte[] row = new byte[] { (byte) (0x00ff & pixels[rowIdx].length),
+                        (byte) ((0xff00 & pixels[rowIdx].length) >> 8) };
 
                 mUsbDeviceConnection.bulkTransfer(mEndPoint, row, row.length, 100000);
 
-                for (int x = 0; x < pixels[y].length; x++) {
+                for (int colIdx = 0; colIdx < pixels[rowIdx].length; colIdx++) {
                     // for each stripe, recollect 3 bytes (3 bytes = 24 bits)
-                    byte[] slice = recollectSlice(y, x, pixels);
+                    byte[] slice = recollectSlice(rowIdx, colIdx, pixels);
                     mUsbDeviceConnection.bulkTransfer(mEndPoint, slice, slice.length, 100000);
                 }
 

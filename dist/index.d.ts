@@ -24,9 +24,10 @@ export interface TSPLImageLabelOptions {
     gapMM?: number;
     dotMM?: number;
     printerWidthMM: number;
-    printerHeightMM: number;
+    printerHeightMM?: number;
     left?: number;
     top?: number;
+    invert?: boolean;
 }
 export interface IUSBPrinter {
     device_name: string;
@@ -105,6 +106,40 @@ declare const USBPrinter: {
      * @param options Configuration options for TSPL image label printing
      */
     printTSPLImageLabel: (base64Image: string | null, options: TSPLImageLabelOptions) => void;
+    /**
+     * Generate TSPL commands for auto feed and cut operations (returns base64 string)
+     * No text printing, just feed and cut commands
+     * @param opts Configuration options for TSPL auto feed and cut
+     *            - cut (boolean, default: false): Cut paper after printing
+     *            - tailingLine (boolean, default: false): Feed extra paper before printing
+     *            - feedDots (number, default: 50): Number of dots to feed
+     *            - eop (boolean, default: false): Use EOP (End Of Print) command instead of PRINT
+     * @returns Promise<string> Base64-encoded TSPL commands
+     */
+    generateAutoFeedAndCut: (opts?: {
+        cut?: boolean;
+        tailingLine?: boolean;
+        feedDots?: number;
+        eop?: boolean;
+    }) => Promise<string>;
+    /**
+     * Feed paper (TSPL)
+     * @param feedDots Number of dots to feed (default: 50)
+     * @param eop Use EOP (End Of Print) command instead of PRINT (default: false)
+     */
+    feed: (feedDots?: number, eop?: boolean) => void;
+    /**
+     * Cut paper (TSPL)
+     * @param feedDots Number of dots to feed before cutting (default: 50)
+     * @param eop Use EOP (End Of Print) command instead of PRINT (default: false)
+     */
+    cut: (feedDots?: number, eop?: boolean) => void;
+    /**
+     * Feed and cut paper (TSPL)
+     * @param feedDots Number of dots to feed (default: 50)
+     * @param eop Use EOP (End Of Print) command instead of PRINT (default: false)
+     */
+    feedAndCut: (feedDots?: number, eop?: boolean) => void;
     /**
      * `columnWidth`
      * 80mm => 46 character

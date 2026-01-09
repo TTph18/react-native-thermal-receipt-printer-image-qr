@@ -63,6 +63,59 @@ public class TSPLCommandHelper {
     }
 
     /**
+     * Generate TSPL commands for auto feed and cut operations (similar to ESC/POS printBill)
+     * No text printing, just feed and cut commands
+     * 
+     * @param cut      If true, cut the paper after printing (FORMFEED + CUT command)
+     * @param feed     If true, feed to next label (FORMFEED command) - tailingLine
+     * @param feedDots Number of dots to feed (ignored when feed=true, use FORMFEED instead)
+     * @param eop      If true, use EOP (End Of Print) command instead of PRINT
+     * @return Base64-encoded TSPL commands
+     */
+    public static String generateAutoFeedAndCut(
+            boolean cut,
+            boolean feed,
+            int feedDots,
+            boolean eop) {
+        StringBuilder tspl = new StringBuilder();
+
+        // Feed to next label before printing if requested (tailingLine)
+        // FORMFEED is better for label printers as it uses gap/mark detection
+        if (feed) {
+            tspl.append("FORMFEED\r\n");
+        }
+
+        // Print command (only if not using EOP - EOP must be last)
+        if (!eop) {
+            tspl.append("PRINT 1,1\r\n");
+        }
+
+        // Cut paper after printing if requested (only if not using EOP)
+        // Note: CUT command may not be supported by all TSPL printers
+        // Use FORMFEED to advance to next label before cutting
+        if (cut && !eop) {
+            // Feed to next label for cutting
+            tspl.append("FORMFEED\r\n");
+            // Try CUT command (may not work on all printers)
+            // If CUT is not supported, the FORMFEED will position paper for manual cutting
+            tspl.append("CUT\r\n");
+        }
+
+        // EOP command must be last (End Of Print)
+        if (eop) {
+            tspl.append("EOP\r\n");
+        }
+
+        // Convert to base64
+        byte[] tsplBytes = tspl.toString().getBytes(StandardCharsets.US_ASCII);
+        String base64 = Base64.encodeToString(tsplBytes, Base64.NO_WRAP);
+
+        Log.d(TAG, "Generated TSPL auto feed and cut command: " + tspl.toString().replace("\r\n", "\\r\\n"));
+
+        return base64;
+    }
+
+    /**
      * Convert TSPL command string to base64
      * Use this if you're generating TSPL commands in Kotlin and just need to encode
      * them

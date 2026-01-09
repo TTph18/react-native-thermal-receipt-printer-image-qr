@@ -483,6 +483,173 @@ var USBPrinter = {
     }
   },
   /**
+   * Generate TSPL commands for auto feed and cut operations (returns base64 string)
+   * No text printing, just feed and cut commands
+   * @param opts Configuration options for TSPL auto feed and cut
+   *            - cut (boolean, default: false): Cut paper after printing
+   *            - tailingLine (boolean, default: false): Feed extra paper before printing
+   *            - feedDots (number, default: 50): Number of dots to feed
+   *            - eop (boolean, default: false): Use EOP (End Of Print) command instead of PRINT
+   * @returns Promise<string> Base64-encoded TSPL commands
+   */
+  generateAutoFeedAndCut: function (opts) {
+    if (opts === void 0) {
+      opts = {};
+    }
+    return new Promise(function (resolve, reject) {
+      if (Platform.OS === "ios") {
+        reject(new Error("TSPL printing not supported on iOS"));
+        return;
+      }
+      if (
+        !RNUSBPrinter ||
+        typeof RNUSBPrinter.generateAutoFeedAndCut !== "function"
+      ) {
+        reject(
+          new Error(
+            "generateAutoFeedAndCut is not available. Please rebuild the app after updating the native module."
+          )
+        );
+        return;
+      }
+      RNUSBPrinter.generateAutoFeedAndCut(
+        opts,
+        function (base64) {
+          return resolve(base64);
+        },
+        function (error) {
+          return reject(error);
+        }
+      );
+    });
+  },
+  /**
+   * Feed paper (TSPL)
+   * @param feedDots Number of dots to feed (default: 50)
+   * @param eop Use EOP (End Of Print) command instead of PRINT (default: false)
+   */
+  feed: function (feedDots, eop) {
+    if (feedDots === void 0) {
+      feedDots = 50;
+    }
+    if (eop === void 0) {
+      eop = false;
+    }
+    if (Platform.OS === "ios") {
+      console.warn("TSPL printing not supported on iOS");
+      return;
+    }
+    if (
+      !RNUSBPrinter ||
+      typeof RNUSBPrinter.generateAutoFeedAndCut !== "function"
+    ) {
+      console.warn(
+        "feed is not available. Please rebuild the app after updating the native module."
+      );
+      return;
+    }
+    RNUSBPrinter.generateAutoFeedAndCut(
+      {
+        cut: false,
+        tailingLine: true,
+        feedDots: feedDots,
+        eop: eop,
+      },
+      function (base64) {
+        RNUSBPrinter.printRawData(base64, function (error) {
+          return console.warn(error);
+        });
+      },
+      function (error) {
+        return console.warn(error);
+      }
+    );
+  },
+  /**
+   * Cut paper (TSPL)
+   * @param feedDots Number of dots to feed before cutting (default: 50)
+   * @param eop Use EOP (End Of Print) command instead of PRINT (default: false)
+   */
+  cut: function (feedDots, eop) {
+    if (feedDots === void 0) {
+      feedDots = 50;
+    }
+    if (eop === void 0) {
+      eop = false;
+    }
+    if (Platform.OS === "ios") {
+      console.warn("TSPL printing not supported on iOS");
+      return;
+    }
+    if (
+      !RNUSBPrinter ||
+      typeof RNUSBPrinter.generateAutoFeedAndCut !== "function"
+    ) {
+      console.warn(
+        "cut is not available. Please rebuild the app after updating the native module."
+      );
+      return;
+    }
+    RNUSBPrinter.generateAutoFeedAndCut(
+      {
+        cut: true,
+        tailingLine: false,
+        feedDots: feedDots,
+        eop: eop,
+      },
+      function (base64) {
+        RNUSBPrinter.printRawData(base64, function (error) {
+          return console.warn(error);
+        });
+      },
+      function (error) {
+        return console.warn(error);
+      }
+    );
+  },
+  /**
+   * Feed and cut paper (TSPL)
+   * @param feedDots Number of dots to feed (default: 50)
+   * @param eop Use EOP (End Of Print) command instead of PRINT (default: false)
+   */
+  feedAndCut: function (feedDots, eop) {
+    if (feedDots === void 0) {
+      feedDots = 50;
+    }
+    if (eop === void 0) {
+      eop = false;
+    }
+    if (Platform.OS === "ios") {
+      console.warn("TSPL printing not supported on iOS");
+      return;
+    }
+    if (
+      !RNUSBPrinter ||
+      typeof RNUSBPrinter.generateAutoFeedAndCut !== "function"
+    ) {
+      console.warn(
+        "feedAndCut is not available. Please rebuild the app after updating the native module."
+      );
+      return;
+    }
+    RNUSBPrinter.generateAutoFeedAndCut(
+      {
+        cut: true,
+        tailingLine: true,
+        feedDots: feedDots,
+        eop: eop,
+      },
+      function (base64) {
+        RNUSBPrinter.printRawData(base64, function (error) {
+          return console.warn(error);
+        });
+      },
+      function (error) {
+        return console.warn(error);
+      }
+    );
+  },
+  /**
    * `columnWidth`
    * 80mm => 46 character
    * 58mm => 30 character

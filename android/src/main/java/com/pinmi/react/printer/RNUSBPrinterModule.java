@@ -146,6 +146,35 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
     }
 
     /**
+     * Generate TSPL commands for auto feed and cut operations (returns base64 string)
+     * No text printing, just feed and cut commands
+     * 
+     * @param options       Options map containing:
+     *                      - cut (boolean, default: false): Cut paper after printing
+     *                      - tailingLine (boolean, default: false): Feed extra paper before printing
+     *                      - feedDots (int, default: 50): Number of dots to feed
+     *                      - eop (boolean, default: false): Use EOP (End Of Print) command instead of PRINT
+     * @param successCallback Returns base64-encoded TSPL commands
+     * @param errorCallback Error callback
+     */
+    @ReactMethod
+    public void generateAutoFeedAndCut(ReadableMap options, Callback successCallback, Callback errorCallback) {
+        try {
+            // Extract options with defaults
+            boolean cut = options.hasKey("cut") ? options.getBoolean("cut") : false;
+            boolean tailingLine = options.hasKey("tailingLine") ? options.getBoolean("tailingLine") : false;
+            int feedDots = options.hasKey("feedDots") ? options.getInt("feedDots") : 50;
+            boolean eop = options.hasKey("eop") ? options.getBoolean("eop") : false;
+
+            String base64TSPL = TSPLCommandHelper.generateAutoFeedAndCut(
+                    cut, tailingLine, feedDots, eop);
+            successCallback.invoke(base64TSPL);
+        } catch (Exception e) {
+            errorCallback.invoke("Failed to generate TSPL auto feed and cut command: " + e.getMessage());
+        }
+    }
+
+    /**
      * Print image only with automatic size calculation based on printer width
      * This method calculates the image size based on printer width (58mm or 80mm)
      * and maintains aspect ratio automatically

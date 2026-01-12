@@ -201,5 +201,47 @@ export const COMMANDS = {
      *  Right justification
      */
     TXT_ALIGN_RT: '\x1b\x61\x02',
+  },
+  POSITION: {
+    /**
+     * Relative Print Position (ESC \)
+     * Moves the print position relative to the current position
+     * 
+     * @param relativePosition The relative position in motion units.
+     *                        Positive values move right, negative values move left.
+     *                        Range: -32768 to 32767
+     * @returns ESC \ nL nH command string
+     */
+    RELATIVE: function(relativePosition: number): string {
+      // Clamp the value to valid range: -32768 to 32767
+      if (relativePosition > 32767) relativePosition = 32767;
+      if (relativePosition < -32768) relativePosition = -32768;
+      
+      let value: number;
+      if (relativePosition >= 0) {
+        // Positive: move right
+        value = relativePosition;
+      } else {
+        // Negative: move left (using complement of 65536)
+        value = 65536 + relativePosition;
+      }
+      
+      const nL = value & 0xFF;
+      const nH = (value >> 8) & 0xFF;
+      
+      return '\x1b\x5c' + String.fromCharCode(nL) + String.fromCharCode(nH);
+    },
+    /**
+     * Absolute Print Position (ESC $)
+     * Sets the print position to an absolute position
+     * 
+     * @param absolutePosition The absolute position in dots
+     * @returns ESC $ nL nH command string
+     */
+    ABSOLUTE: function(absolutePosition: number): string {
+      const nL = absolutePosition & 0xFF;
+      const nH = (absolutePosition >> 8) & 0xFF;
+      return '\x1b\x24' + String.fromCharCode(nL) + String.fromCharCode(nH);
+    }
   }
 }

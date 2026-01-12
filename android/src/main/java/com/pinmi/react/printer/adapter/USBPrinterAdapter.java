@@ -73,7 +73,39 @@ public class USBPrinterAdapter implements PrinterAdapter {
     private final static byte[] SET_LINE_SPACE_24 = new byte[] { ESC_CHAR, 0x33, 24 };
     private final static byte[] SET_LINE_SPACE_32 = new byte[] { ESC_CHAR, 0x33, 32 };
     private final static byte[] LINE_FEED = new byte[] { 0x0A };
+    private static final byte[] LEFT_ALIGN = { 0x1B, 0x61, 0x00 };
     private static final byte[] CENTER_ALIGN = { 0x1B, 0X61, 0X31 };
+
+    /**
+     * Generate Relative Print Position command (ESC \)
+     * 
+     * Format: ESC \ nL nH
+     * Moves the print position relative to the current position.
+     * 
+     * @param relativePosition The relative position in motion units.
+     *                        Positive values move right, negative values move left.
+     *                        Range: -32768 to 32767
+     * @return byte array containing ESC \ nL nH command
+     */
+    private static byte[] getRelativePrintPosition(int relativePosition) {
+        // Clamp the value to valid range: -32768 to 32767
+        if (relativePosition > 32767) relativePosition = 32767;
+        if (relativePosition < -32768) relativePosition = -32768;
+        
+        int value;
+        if (relativePosition >= 0) {
+            // Positive: move right
+            value = relativePosition;
+        } else {
+            // Negative: move left (using complement of 65536)
+            value = 65536 + relativePosition;
+        }
+        
+        byte nL = (byte)(value & 0xFF);
+        byte nH = (byte)((value >> 8) & 0xFF);
+        
+        return new byte[] { 0x1B, 0x5C, nL, nH };
+    }
 
     private USBPrinterAdapter() {
     }
@@ -587,28 +619,19 @@ public class USBPrinterAdapter implements PrinterAdapter {
             // Calculate image width in dots (pixels)
             int imageWidthDots = pixels.length > 0 ? pixels[0].length : imageWidth;
             
-            // Set absolute print position based on x parameter
-            // ESC/POS bit images don't respect text alignment, so we must use ESC $ (set absolute position)
-            int absoluteX = 0;
+            // Set print position based on x parameter
             if (x == 0) {
-                // Left align: position at 0
-                absoluteX = 0;
+                // Left align: use LEFT_ALIGN command (ESC a 0)
+                b = mUsbDeviceConnection.bulkTransfer(mEndPoint, LEFT_ALIGN, LEFT_ALIGN.length, 100000);
             } else if (x < 0) {
-                // Center align: calculate center position
-                // Default printer width: 384 dots (58mm) or 576 dots (80mm)
-                // Try to detect from image width: if image is close to 384, assume 58mm printer
-                int printerWidth = (imageWidthDots <= 400) ? 384 : 576;
-                absoluteX = (printerWidth - imageWidthDots) / 2;
-                if (absoluteX < 0) absoluteX = 0;
+                // Center align: use CENTER_ALIGN command (ESC a 1)
+                b = mUsbDeviceConnection.bulkTransfer(mEndPoint, CENTER_ALIGN, CENTER_ALIGN.length, 100000);
             } else {
-                // Absolute position: use x value directly
-                absoluteX = x;
+                // x > 0: use relative positioning (move x dots to the right from current position)
+                // ESC \ nL nH: Set relative print position
+                byte[] setRelativePosition = getRelativePrintPosition(x);
+                b = mUsbDeviceConnection.bulkTransfer(mEndPoint, setRelativePosition, setRelativePosition.length, 100000);
             }
-            
-            // ESC $ nL nH: Set absolute print position
-            // n = absoluteX position in dots, nL = low byte, nH = high byte
-            byte[] setAbsolutePosition = { 0x1B, 0x24, (byte)(absoluteX & 0xFF), (byte)((absoluteX >> 8) & 0xFF) };
-            b = mUsbDeviceConnection.bulkTransfer(mEndPoint, setAbsolutePosition, setAbsolutePosition.length, 100000);
 
             // Move to y position using line feeds (y is in dots, approximate 24 dots per line)
             if (y > 0) {
@@ -648,15 +671,6 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     }
 
-    /**
-     * Print TSPL image label with automatic size calculation based on printer width
-     * Uses TSPL commands to print the image
-     * printerWidth is already in pixels (e.g., 384 for 58mm, 576 for 80mm)
-     * 
-     * @param bitmapImage   Bitmap image to print
-     * @param printerWidth  Printer width in pixels (already converted from mm)
-     * @param errorCallback Error callback
-     */
     public void printTSPLImageLabel(final Bitmap bitmapImage, int gapMM, int dotMM, int printerWidthMM,
             int printerHeightMM, int left,
             int top,

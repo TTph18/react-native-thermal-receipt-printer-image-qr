@@ -38,9 +38,9 @@ import java.util.List;
 
 /**
  * USB Printer Adapter for React Native Thermal Printer
- * 
+ *
  * Supports both ESC/POS and TSPL (TSC Printer Language) command formats.
- * 
+ *
  * For TSPL commands:
  * - Use printRawData() with base64-encoded TSPL command strings
  * - TSPL commands are text-based (e.g., "SIZE 35 mm, 22 mm\r\n")
@@ -48,7 +48,7 @@ import java.util.List;
  * - Example TSPL command sequence:
  * "SIZE 35 mm, 22 mm\r\nGAP 2 mm, 0 mm\r\nCLS\r\nBITMAP 0,0,280,176,2,<binary
  * data>\r\nPRINT 1,1\r\n"
- * 
+ *
  * Created by xiesubin on 2017/9/20.
  * Modified to support TSPL commands.
  */
@@ -70,7 +70,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     private final static char ESC_CHAR = 0x1B;
     private static final byte[] SELECT_BIT_IMAGE_MODE = { 0x1B, 0x2A, 33 };
-    private final static byte[] SET_LINE_SPACE_24 = new byte[] { ESC_CHAR, 0x33, 24 };
+    private final static byte[] SET_LINE_SPACE_24 = new byte[] { ESC_CHAR, 0x33, 18 };
     private final static byte[] SET_LINE_SPACE_32 = new byte[] { ESC_CHAR, 0x33, 32 };
     private final static byte[] LINE_FEED = new byte[] { 0x0A };
     private static final byte[] LEFT_ALIGN = { 0x1B, 0x61, 0x00 };
@@ -78,20 +78,23 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     /**
      * Generate Relative Print Position command (ESC \)
-     * 
+     *
      * Format: ESC \ nL nH
      * Moves the print position relative to the current position.
-     * 
+     *
      * @param relativePosition The relative position in motion units.
-     *                        Positive values move right, negative values move left.
-     *                        Range: -32768 to 32767
+     *                         Positive values move right, negative values move
+     *                         left.
+     *                         Range: -32768 to 32767
      * @return byte array containing ESC \ nL nH command
      */
     private static byte[] getRelativePrintPosition(int relativePosition) {
         // Clamp the value to valid range: -32768 to 32767
-        if (relativePosition > 32767) relativePosition = 32767;
-        if (relativePosition < -32768) relativePosition = -32768;
-        
+        if (relativePosition > 32767)
+            relativePosition = 32767;
+        if (relativePosition < -32768)
+            relativePosition = -32768;
+
         int value;
         if (relativePosition >= 0) {
             // Positive: move right
@@ -100,11 +103,36 @@ public class USBPrinterAdapter implements PrinterAdapter {
             // Negative: move left (using complement of 65536)
             value = 65536 + relativePosition;
         }
-        
-        byte nL = (byte)(value & 0xFF);
-        byte nH = (byte)((value >> 8) & 0xFF);
-        
+
+        byte nL = (byte) (value & 0xFF);
+        byte nH = (byte) ((value >> 8) & 0xFF);
+
         return new byte[] { 0x1B, 0x5C, nL, nH };
+    }
+
+    /**
+     * Generate Left Margin command (GS L)
+     *
+     * Format: GS L nL nH
+     * Sets the left margin from the left edge of the printable area.
+     * This command is enabled only when processed at the beginning of a line.
+     *
+     * @param leftMargin The left margin in motion units.
+     *                   Range: 0 to 65535
+     * @return byte array containing GS L nL nH command
+     */
+    private static byte[] getLeftMargin(int leftMargin) {
+        // Clamp the value to valid range: 0 to 65535
+        if (leftMargin < 0)
+            leftMargin = 0;
+        if (leftMargin > 65535)
+            leftMargin = 65535;
+
+        byte nL = (byte) (leftMargin & 0xFF);
+        byte nH = (byte) ((leftMargin >> 8) & 0xFF);
+
+        // GS L: 0x1D 0x4C
+        return new byte[] { 0x1D, 0x4C, nL, nH };
     }
 
     private USBPrinterAdapter() {
@@ -322,7 +350,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
      * Supports both ESC/POS and TSPL command formats.
      * For TSPL commands, the data should be base64-encoded TSPL command strings
      * (e.g., "SIZE 35 mm, 22 mm\r\n").
-     * 
+     *
      * @param data          Base64-encoded raw data (can be ESC/POS binary commands
      *                      or TSPL text commands)
      * @param errorCallback Error callback
@@ -603,7 +631,8 @@ public class USBPrinterAdapter implements PrinterAdapter {
      * x: Default -1 = center align, 0 = left align, > 0 = absolute position in dots
      * y: Default 0 = top, vertical position in dots (approximate 24 dots per line)
      */
-    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, int x, int y, Callback errorCallback) {
+    public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, int x, int y,
+                                 Callback errorCallback) {
         if (bitmapImage == null) {
             errorCallback.invoke("image not found");
             return;
@@ -618,7 +647,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
             // Calculate image width in dots (pixels)
             int imageWidthDots = pixels.length > 0 ? pixels[0].length : imageWidth;
-            
+
             // Set print position based on x parameter
             if (x == 0) {
                 // Left align: use LEFT_ALIGN command (ESC a 0)
@@ -627,18 +656,26 @@ public class USBPrinterAdapter implements PrinterAdapter {
                 // Center align: use CENTER_ALIGN command (ESC a 1)
                 b = mUsbDeviceConnection.bulkTransfer(mEndPoint, CENTER_ALIGN, CENTER_ALIGN.length, 100000);
             } else {
-                // x > 0: use relative positioning (move x dots to the right from current position)
-                // ESC \ nL nH: Set relative print position
-                byte[] setRelativePosition = getRelativePrintPosition(x);
-                b = mUsbDeviceConnection.bulkTransfer(mEndPoint, setRelativePosition, setRelativePosition.length, 100000);
-            }
+                // x > 0: use Left Margin command (GS L)
+                // Format: GS L nL nH where value = nL + (nH × 256)
+                // Range: 0 ≤ nL ≤ 255, 0 ≤ nH ≤ 255, 0 ≤ (nL + (nH × 256)) ≤ 65535
 
-            // Move to y position using line feeds (y is in dots, approximate 24 dots per line)
-            if (y > 0) {
-                int linesToFeed = y / 24;
-                for (int i = 0; i < linesToFeed; i++) {
-                    mUsbDeviceConnection.bulkTransfer(mEndPoint, LINE_FEED, LINE_FEED.length, 100000);
-                }
+                // Clamp x to valid range
+                int leftMargin = x;
+                if (leftMargin < 0) leftMargin = 0;
+                if (leftMargin > 65535) leftMargin = 65535;
+
+                // Split into low byte (nL) and high byte (nH)
+                byte nL = (byte) (leftMargin & 0xFF);
+                byte nH = (byte) ((leftMargin >> 8) & 0xFF);
+
+                // Send GS L command: 0x1D 0x4C nL nH
+                byte[] setLeftMargin = new byte[] { 0x1D, 0x4C, nL, nH };
+                b = mUsbDeviceConnection.bulkTransfer(mEndPoint, setLeftMargin, setLeftMargin.length, 100000);
+
+                // Log for debugging
+                Log.d(LOG_TAG, String.format("GS L: x=%d, nL=0x%02X (%d), nH=0x%02X (%d), value=%d",
+                        x, nL & 0xFF, nL & 0xFF, nH & 0xFF, nH & 0xFF, leftMargin));
             }
 
             for (int rowIdx = 0; rowIdx < pixels.length; rowIdx += 24) {
@@ -672,10 +709,10 @@ public class USBPrinterAdapter implements PrinterAdapter {
     }
 
     public void printTSPLImageLabel(final Bitmap bitmapImage, int gapMM, int dotMM, int printerWidthMM,
-            int printerHeightMM, int left,
-            int top,
-            boolean invert,
-            Callback errorCallback) {
+                                    int printerHeightMM, int left,
+                                    int top,
+                                    boolean invert,
+                                    Callback errorCallback) {
         if (bitmapImage == null) {
             errorCallback.invoke("bitmap image is null");
             return;

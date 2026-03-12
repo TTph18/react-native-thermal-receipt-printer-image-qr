@@ -392,6 +392,11 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
         final UsbDeviceConnection connection = mUsbDeviceConnection;
         final UsbEndpoint endpoint = mEndPoint;
+        if (connection == null || endpoint == null) {
+            Log.e(LOG_TAG, "USB connection or endpoint is null before print thread");
+            errorCallback.invoke("USB connection not available");
+            return;
+        }
 
         new Thread(new Runnable() {
             @Override
@@ -475,6 +480,11 @@ public class USBPrinterAdapter implements PrinterAdapter {
                     int timeout = 5000; // 5 seconds timeout for TSPL printers (increased from 100ms)
 
                     while (offset < bytes.length) {
+                        if (connection == null || endpoint == null) {
+                            Log.e(LOG_TAG, "USB connection lost during transfer");
+                            errorCallback.invoke("USB connection lost during transfer");
+                            return;
+                        }
                         int length = Math.min(chunkSize, bytes.length - offset);
                         int result;
 
@@ -582,7 +592,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
         Log.v(LOG_TAG, "start to print image data " + bitmapImage);
         boolean isConnected = openConnection();
-        if (isConnected) {
+        if (isConnected && mUsbDeviceConnection != null && mEndPoint != null) {
             Log.v(LOG_TAG, "Connected to device");
             int[][] pixels = getPixelsSlow(bitmapImage, imageWidth, imageHeight);
 
@@ -640,7 +650,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
         Log.v(LOG_TAG, "start to print image data " + bitmapImage);
         boolean isConnected = openConnection();
-        if (isConnected) {
+        if (isConnected && mUsbDeviceConnection != null && mEndPoint != null) {
             int[][] pixels = getPixelsSlow(bitmapImage, imageWidth, imageHeight);
 
             int b = mUsbDeviceConnection.bulkTransfer(mEndPoint, SET_LINE_SPACE_24, SET_LINE_SPACE_24.length, 100000);

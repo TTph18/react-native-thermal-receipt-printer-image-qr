@@ -115,7 +115,7 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
      * Encode TSPL command string to base64
      * Use this if you're generating TSPL commands in Kotlin and just need to encode
      * them
-     * 
+     *
      * @param tsplCommand     TSPL command string
      * @param successCallback Returns base64-encoded TSPL commands
      * @param errorCallback   Error callback
@@ -133,7 +133,7 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
     /**
      * Generate TSPL and print directly
      * Convenience method that generates TSPL command and prints it in one call
-     * 
+     *
      * @param width         Label width in mm
      * @param height        Label height in mm
      * @param gap           Gap between labels in mm
@@ -165,7 +165,7 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
     /**
      * Generate TSPL commands for auto feed and cut operations (returns base64 string)
      * No text printing, just feed and cut commands
-     * 
+     *
      * @param options       Options map containing:
      *                      - cut (boolean, default: false): Cut paper after printing
      *                      - tailingLine (boolean, default: false): Feed extra paper before printing
@@ -195,7 +195,7 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
      * Print image only with automatic size calculation based on printer width
      * This method calculates the image size based on printer width (58mm or 80mm)
      * and maintains aspect ratio automatically
-     * 
+     *
      * @param base64Image   Base64-encoded image data
      * @param options       Options map containing:
      *                      - gapMM (double): Gap between labels in mm
@@ -204,10 +204,15 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
      *                      - printerHeightMM (double): Printer height in mm
      *                      - left (int): Left position in dots
      *                      - top (int): Top position in dots
+     * @param successCallback Success callback invoked after the USB write thread finishes
      * @param errorCallback Error callback
      */
     @ReactMethod
-    public void printTSPLImageLabel(String base64Image, ReadableMap options, Callback errorCallback) {
+    public void printTSPLImageLabel(
+            String base64Image,
+            ReadableMap options,
+            Callback successCallback,
+            Callback errorCallback) {
         try {
             // Extract options with defaults
             int gapMM = options.hasKey("gapMM") ? options.getInt("gapMM") : 2;
@@ -237,6 +242,7 @@ public class RNUSBPrinterModule extends ReactContextBaseJavaModule implements RN
                 USBPrinterAdapter usbAdapter = (USBPrinterAdapter) this.adapter;
                 usbAdapter.printTSPLImageLabel(decodedByte, gapMM, dotMM, printerWidthMM, printerHeightMM,
                         left, top, invert,
+                        successCallback,
                         errorCallback);
             } else {
                 errorCallback.invoke("Adapter is not USBPrinterAdapter instance");

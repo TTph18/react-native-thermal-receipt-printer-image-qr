@@ -314,28 +314,34 @@ const USBPrinter = {
   printTSPLImageLabel: (
     base64Image: string | null,
     options: TSPLImageLabelOptions
-  ): void => {
-    if (Platform.OS === "ios") {
-      console.warn("TSPL printing not supported on iOS");
-      return;
-    }
-    
-    if (!RNUSBPrinter || typeof RNUSBPrinter.printTSPLImageLabel !== "function") {
-      console.warn("printTSPLImageLabel is not available. Please rebuild the app after updating the native module.");
-      return;
-    }
+  ): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (Platform.OS === "ios") {
+        reject(new Error("TSPL printing not supported on iOS"));
+        return;
+      }
 
-    if (!base64Image) {
-      console.warn("base64Image is required for printTSPLImageLabel");
-      return;
-    }
+      if (!RNUSBPrinter || typeof RNUSBPrinter.printTSPLImageLabel !== "function") {
+        reject(
+          new Error(
+            "printTSPLImageLabel is not available. Please rebuild the app after updating the native module."
+          )
+        );
+        return;
+      }
 
-    // Call native method with options object
-    RNUSBPrinter.printTSPLImageLabel(
-      base64Image,
-      options,
-      (error: Error) => console.warn(error)
-    );
+      if (!base64Image) {
+        reject(new Error("base64Image is required for printTSPLImageLabel"));
+        return;
+      }
+
+      RNUSBPrinter.printTSPLImageLabel(
+        base64Image,
+        options,
+        () => resolve(),
+        (error: Error) => reject(error)
+      );
+    });
   },
   /**
    * Generate TSPL commands for auto feed and cut operations (returns base64 string)

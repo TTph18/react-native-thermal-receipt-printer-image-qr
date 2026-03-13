@@ -107,7 +107,7 @@ declare const USBPrinter: {
      * @param base64Image Base64-encoded image data
      * @param options Configuration options for TSPL image label printing
      */
-    printTSPLImageLabel: (base64Image: string | null, options: TSPLImageLabelOptions) => void;
+    printTSPLImageLabel: (base64Image: string | null, options: TSPLImageLabelOptions) => Promise<void>;
     /**
      * Generate TSPL commands for auto feed and cut operations (returns base64 string)
      * No text printing, just feed and cut commands

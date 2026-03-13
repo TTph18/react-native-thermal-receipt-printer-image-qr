@@ -489,26 +489,37 @@ var USBPrinter = {
     base64Image,
     options
   ) {
-    if (Platform.OS === "ios") {
-      console.warn("TSPL printing not supported on iOS");
-    } else {
-      if (
-        !RNUSBPrinter ||
-        typeof RNUSBPrinter.printTSPLImageLabel !== "function"
-      ) {
-        console.warn(
-          "printTSPLImageLabel is not available. Please rebuild the app after updating the native module."
-        );
-        return;
-      }
-      RNUSBPrinter.printTSPLImageLabel(
-        base64Image || "",
-        options,
-        function (error) {
-          return console.warn(error);
+    return new Promise(function (resolve, reject) {
+      if (Platform.OS === "ios") {
+        reject(new Error("TSPL printing not supported on iOS"));
+      } else {
+        if (
+          !RNUSBPrinter ||
+          typeof RNUSBPrinter.printTSPLImageLabel !== "function"
+        ) {
+          reject(
+            new Error(
+              "printTSPLImageLabel is not available. Please rebuild the app after updating the native module."
+            )
+          );
+          return;
         }
-      );
-    }
+        if (!base64Image) {
+          reject(new Error("base64Image is required for printTSPLImageLabel"));
+          return;
+        }
+        RNUSBPrinter.printTSPLImageLabel(
+          base64Image,
+          options,
+          function () {
+            return resolve();
+          },
+          function (error) {
+            return reject(error);
+          }
+        );
+      }
+    });
   },
   /**
    * Generate TSPL commands for auto feed and cut operations (returns base64 string)

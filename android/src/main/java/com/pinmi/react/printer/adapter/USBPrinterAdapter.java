@@ -190,7 +190,12 @@ public class USBPrinterAdapter implements PrinterAdapter {
     public void init(ReactApplicationContext reactContext, Callback successCallback, Callback errorCallback) {
         this.mContext = reactContext;
         this.mUSBManager = (UsbManager) this.mContext.getSystemService(Context.USB_SERVICE);
-        this.mPermissionIndent = PendingIntent.getBroadcast(mContext, 0, new Intent(ACTION_USB_PERMISSION),
+        Intent permissionIntent = new Intent(ACTION_USB_PERMISSION);
+        permissionIntent.setPackage(mContext.getPackageName());
+        this.mPermissionIndent = PendingIntent.getBroadcast(
+                mContext,
+                0,
+                permissionIntent,
                 PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
@@ -356,6 +361,10 @@ public class USBPrinterAdapter implements PrinterAdapter {
      * @param errorCallback Error callback
      */
     public void printRawData(String data, Callback errorCallback) {
+        printRawData(data, null, errorCallback);
+    }
+
+    public void printRawData(String data, Callback successCallback, Callback errorCallback) {
         final String rawData = data;
         Log.v(LOG_TAG, "start to print raw data (length: " + (rawData != null ? rawData.length() : 0) + ")");
 
@@ -553,6 +562,10 @@ public class USBPrinterAdapter implements PrinterAdapter {
                     } catch (Exception e) {
                         // Not ASCII, skip check
                     }
+
+                    if (successCallback != null) {
+                        successCallback.invoke("OK");
+                    }
                 } catch (Exception e) {
                     String errorMsg = "Failed to print raw data: " + e.getMessage();
                     Log.e(LOG_TAG, errorMsg, e);
@@ -722,6 +735,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
                                     int printerHeightMM, int left,
                                     int top,
                                     boolean invert,
+                                    Callback successCallback,
                                     Callback errorCallback) {
         if (bitmapImage == null) {
             errorCallback.invoke("bitmap image is null");
@@ -753,7 +767,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
             }
 
             // Print using printRawData which handles TSPL commands
-            printRawData(base64TSPL, errorCallback);
+            printRawData(base64TSPL, successCallback, errorCallback);
 
         } catch (Exception e) {
             Log.e(LOG_TAG, "Failed to print TSPL image label: " + e.getMessage());

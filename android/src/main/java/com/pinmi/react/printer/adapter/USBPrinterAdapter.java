@@ -641,7 +641,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
             for (int y = 0; y < pixels.length; y += 24) {
                 ByteArrayOutputStream rowStream = new ByteArrayOutputStream();
-                rowStream.write(SELECT_BIT_IMAGE_MODE);
+                rowStream.write(SELECT_BIT_IMAGE_MODE, 0, SELECT_BIT_IMAGE_MODE.length);
                 // Set nL and nH based on the width of the image
                 rowStream.write((byte) (0x00ff & pixels[y].length));
                 rowStream.write((byte) ((0xff00 & pixels[y].length) >> 8));
@@ -720,7 +720,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
             for (int rowIdx = 0; rowIdx < pixels.length; rowIdx += 24) {
                 ByteArrayOutputStream rowStream = new ByteArrayOutputStream();
-                rowStream.write(SELECT_BIT_IMAGE_MODE);
+                rowStream.write(SELECT_BIT_IMAGE_MODE, 0, SELECT_BIT_IMAGE_MODE.length);
                 // Set nL and nH based on the width of the image
                 rowStream.write((byte) (0x00ff & pixels[rowIdx].length));
                 rowStream.write((byte) ((0xff00 & pixels[rowIdx].length) >> 8));

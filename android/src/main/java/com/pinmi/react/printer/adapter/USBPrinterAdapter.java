@@ -109,6 +109,36 @@ public class USBPrinterAdapter implements PrinterAdapter {
         return new byte[] { 0x1B, 0x5C, nL, nH };
     }
 
+    /**
+     * Write bytes fully to USB endpoint in chunks.
+     * Prevents partial/missing writes that can cause image artifacts.
+     */
+    private boolean writeFully(byte[] data, int timeoutMs) {
+        if (mUsbDeviceConnection == null || mEndPoint == null || data == null || data.length == 0) {
+            return false;
+        }
+
+        int offset = 0;
+        final int chunkSize = 4096;
+        while (offset < data.length) {
+            int len = Math.min(chunkSize, data.length - offset);
+            int written;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                written = mUsbDeviceConnection.bulkTransfer(mEndPoint, data, offset, len, timeoutMs);
+            } else {
+                byte[] chunk = new byte[len];
+                System.arraycopy(data, offset, chunk, 0, len);
+                written = mUsbDeviceConnection.bulkTransfer(mEndPoint, chunk, len, timeoutMs);
+            }
+            if (written <= 0) {
+                Log.e(LOG_TAG, "USB write failed. requested=" + len + ", written=" + written);
+                return false;
+            }
+            offset += written;
+        }
+        return true;
+    }
+
     private USBPrinterAdapter() {
     }
 
@@ -610,23 +640,24 @@ public class USBPrinterAdapter implements PrinterAdapter {
             b = mUsbDeviceConnection.bulkTransfer(mEndPoint, CENTER_ALIGN, CENTER_ALIGN.length, 100000);
 
             for (int y = 0; y < pixels.length; y += 24) {
-                mUsbDeviceConnection.bulkTransfer(mEndPoint, SELECT_BIT_IMAGE_MODE, SELECT_BIT_IMAGE_MODE.length,
-                        100000);
-
+                ByteArrayOutputStream rowStream = new ByteArrayOutputStream();
+                rowStream.write(SELECT_BIT_IMAGE_MODE);
                 // Set nL and nH based on the width of the image
-                byte[] row = new byte[] { (byte) (0x00ff & pixels[y].length),
-                        (byte) ((0xff00 & pixels[y].length) >> 8) };
-
-                mUsbDeviceConnection.bulkTransfer(mEndPoint, row, row.length, 100000);
+                rowStream.write((byte) (0x00ff & pixels[y].length));
+                rowStream.write((byte) ((0xff00 & pixels[y].length) >> 8));
 
                 for (int x = 0; x < pixels[y].length; x++) {
                     // for each stripe, recollect 3 bytes (3 bytes = 24 bits)
                     byte[] slice = recollectSlice(y, x, pixels);
-                    mUsbDeviceConnection.bulkTransfer(mEndPoint, slice, slice.length, 100000);
+                    rowStream.write(slice, 0, slice.length);
                 }
 
                 // Do a line feed, if not the printing will resume on the same line
-                mUsbDeviceConnection.bulkTransfer(mEndPoint, LINE_FEED, LINE_FEED.length, 100000);
+                rowStream.write(LINE_FEED, 0, LINE_FEED.length);
+                if (!writeFully(rowStream.toByteArray(), 100000)) {
+                    errorCallback.invoke("failed to write image row data");
+                    return;
+                }
             }
 
             mUsbDeviceConnection.bulkTransfer(mEndPoint, SET_LINE_SPACE_32, SET_LINE_SPACE_32.length, 100000);
@@ -688,23 +719,24 @@ public class USBPrinterAdapter implements PrinterAdapter {
             }
 
             for (int rowIdx = 0; rowIdx < pixels.length; rowIdx += 24) {
-                mUsbDeviceConnection.bulkTransfer(mEndPoint, SELECT_BIT_IMAGE_MODE, SELECT_BIT_IMAGE_MODE.length,
-                        100000);
-
+                ByteArrayOutputStream rowStream = new ByteArrayOutputStream();
+                rowStream.write(SELECT_BIT_IMAGE_MODE);
                 // Set nL and nH based on the width of the image
-                byte[] row = new byte[] { (byte) (0x00ff & pixels[rowIdx].length),
-                        (byte) ((0xff00 & pixels[rowIdx].length) >> 8) };
-
-                mUsbDeviceConnection.bulkTransfer(mEndPoint, row, row.length, 100000);
+                rowStream.write((byte) (0x00ff & pixels[rowIdx].length));
+                rowStream.write((byte) ((0xff00 & pixels[rowIdx].length) >> 8));
 
                 for (int colIdx = 0; colIdx < pixels[rowIdx].length; colIdx++) {
                     // for each stripe, recollect 3 bytes (3 bytes = 24 bits)
                     byte[] slice = recollectSlice(rowIdx, colIdx, pixels);
-                    mUsbDeviceConnection.bulkTransfer(mEndPoint, slice, slice.length, 100000);
+                    rowStream.write(slice, 0, slice.length);
                 }
 
                 // Do a line feed, if not the printing will resume on the same line
-                mUsbDeviceConnection.bulkTransfer(mEndPoint, LINE_FEED, LINE_FEED.length, 100000);
+                rowStream.write(LINE_FEED, 0, LINE_FEED.length);
+                if (!writeFully(rowStream.toByteArray(), 100000)) {
+                    errorCallback.invoke("failed to write image row data");
+                    return;
+                }
             }
 
             mUsbDeviceConnection.bulkTransfer(mEndPoint, SET_LINE_SPACE_32, SET_LINE_SPACE_32.length, 100000);

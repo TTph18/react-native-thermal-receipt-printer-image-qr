@@ -28,7 +28,7 @@ export interface PrinterImageOptions {
   encoding?: string;
   imageWidth?: number;
   imageHeight?: number;
-  x?: number; // X position in dots (USB printer only: default -1 = center align, 0 = left align, > 0 = absolute position)
+  x?: number; // X position in dots (USB printer only: default -1 = center align, 0 = left align, > 0 = relative offset)
   y?: number; // Y position in dots (USB printer only: default 0 = top, approximate 24 dots per line)
   printerWidthType?: PrinterWidth;
   // only ios
@@ -202,7 +202,7 @@ const USBPrinter = {
           Base64,
           opts?.imageWidth ?? 0,
           opts?.imageHeight ?? 0,
-          opts?.x ?? -1, // Default: -1 = center align, 0 = left align, > 0 = absolute position
+          opts?.x ?? -1, // Default: -1 = center align, 0 = left align, > 0 = relative offset
           opts?.y ?? 0,  // Default: 0 = top
           (error: Error) => console.warn(error)
         );

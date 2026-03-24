@@ -85,10 +85,8 @@ public class TSPLCommandHelper {
             tspl.append("FORMFEED\r\n");
         }
 
-        // Print command (only if not using EOP - EOP must be last)
-        if (!eop) {
-            tspl.append("PRINT 1,1\r\n");
-        }
+        // Do NOT emit PRINT here. This helper is for feed/cut operations only.
+        // Emitting PRINT in this path can cause duplicated/overlapped output on some label workflows.
 
         // Cut paper after printing if requested (only if not using EOP)
         // Note: CUT command may not be supported by all TSPL printers

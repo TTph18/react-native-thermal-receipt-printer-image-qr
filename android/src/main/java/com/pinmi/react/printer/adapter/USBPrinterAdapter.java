@@ -70,12 +70,11 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     private final static char ESC_CHAR = 0x1B;
     private static final byte[] SELECT_BIT_IMAGE_MODE = { 0x1B, 0x2A, 33 };
-    private final static byte[] SET_LINE_SPACE_24 = new byte[] { ESC_CHAR, 0x33, 18 };
+    private final static byte[] SET_LINE_SPACE_24 = new byte[] { ESC_CHAR, 0x33, 24 };
     private final static byte[] SET_LINE_SPACE_32 = new byte[] { ESC_CHAR, 0x33, 32 };
     private final static byte[] LINE_FEED = new byte[] { 0x0A };
     private static final byte[] LEFT_ALIGN = { 0x1B, 0x61, 0x00 };
     private static final byte[] CENTER_ALIGN = { 0x1B, 0X61, 0X31 };
-
     /**
      * Generate Relative Print Position command (ESC \)
      *
@@ -108,31 +107,6 @@ public class USBPrinterAdapter implements PrinterAdapter {
         byte nH = (byte) ((value >> 8) & 0xFF);
 
         return new byte[] { 0x1B, 0x5C, nL, nH };
-    }
-
-    /**
-     * Generate Left Margin command (GS L)
-     *
-     * Format: GS L nL nH
-     * Sets the left margin from the left edge of the printable area.
-     * This command is enabled only when processed at the beginning of a line.
-     *
-     * @param leftMargin The left margin in motion units.
-     *                   Range: 0 to 65535
-     * @return byte array containing GS L nL nH command
-     */
-    private static byte[] getLeftMargin(int leftMargin) {
-        // Clamp the value to valid range: 0 to 65535
-        if (leftMargin < 0)
-            leftMargin = 0;
-        if (leftMargin > 65535)
-            leftMargin = 65535;
-
-        byte nL = (byte) (leftMargin & 0xFF);
-        byte nH = (byte) ((leftMargin >> 8) & 0xFF);
-
-        // GS L: 0x1D 0x4C
-        return new byte[] { 0x1D, 0x4C, nL, nH };
     }
 
     private USBPrinterAdapter() {
@@ -185,6 +159,33 @@ public class USBPrinterAdapter implements PrinterAdapter {
             }
         }
     };
+
+    private boolean looksLikeTSPL(byte[] bytes) {
+        try {
+            String s = new String(bytes, "US-ASCII").trim().toUpperCase();
+            // TSPL commands are text and typically start with one of these keywords.
+            return s.startsWith("SIZE ") || s.startsWith("GAP ") || s.startsWith("BLINE ")
+                    || s.startsWith("DIRECTION ") || s.startsWith("REFERENCE ")
+                    || s.startsWith("OFFSET ") || s.startsWith("DENSITY ")
+                    || s.startsWith("SPEED ") || s.startsWith("CLS")
+                    || s.startsWith("TEXT ") || s.startsWith("BARCODE ")
+                    || s.startsWith("QRCODE ") || s.startsWith("BITMAP ")
+                    || s.startsWith("PUTBMP ") || s.startsWith("FORMFEED")
+                    || s.startsWith("PRINT ") || s.startsWith("EOP")
+                    || s.startsWith("CUT");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean looksLikeESCPOS(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return false;
+        }
+        // ESC/POS command streams usually start with control bytes such as ESC/GS/FS/DLE.
+        byte first = bytes[0];
+        return first == 0x1B || first == 0x1D || first == 0x1C || first == 0x10;
+    }
 
     @SuppressLint("UnspecifiedImmutableFlag")
     public void init(ReactApplicationContext reactContext, Callback successCallback, Callback errorCallback) {
@@ -429,21 +430,17 @@ public class USBPrinterAdapter implements PrinterAdapter {
                     Log.d(LOG_TAG, hexDump.toString());
 
                     // Detect command type: TSPL vs ESC/POS
-                    boolean isESCPOS = false;
-                    boolean isTSPL = false;
-
-                    // Check for ESC/POS commands (start with 0x1B ESC character)
-                    if (bytes.length > 0 && bytes[0] == 0x1B) {
-                        isESCPOS = true;
-                    }
+                    // Prefer explicit ESC/POS control prefix over fuzzy text matching.
+                    boolean isESCPOS = looksLikeESCPOS(bytes);
+                    boolean isTSPL = !isESCPOS && looksLikeTSPL(bytes);
 
                     // Also log as string if it's printable (for TSPL text commands)
                     try {
                         String asString = new String(bytes, "US-ASCII");
-                        // Check if it contains TSPL commands
-                        isTSPL = asString.contains("SIZE") || asString.contains("PRINT") ||
-                                asString.contains("CLS") || asString.contains("BITMAP") ||
-                                asString.contains("GAP") || asString.contains("REFERENCE");
+                        // Re-evaluate TSPL only when stream is not already identified as ESC/POS
+                        if (!isESCPOS) {
+                            isTSPL = looksLikeTSPL(bytes);
+                        }
 
                         if (isTSPL) {
                             // Replace control chars for readability
@@ -472,11 +469,10 @@ public class USBPrinterAdapter implements PrinterAdapter {
                         }
                     }
 
-                    if (isESCPOS) {
-                        Log.e(LOG_TAG,
-                                "ERROR: ESC/POS commands detected. For TSPL printers, you must send TSPL text commands like:");
-                        Log.e(LOG_TAG,
-                                "  \"SIZE 35 mm, 22 mm\\r\\nGAP 2 mm, 0 mm\\r\\nCLS\\r\\nBITMAP 0,0,280,176,2,<data>\\r\\nPRINT 1,1\\r\\n\"");
+                    if (isTSPL) {
+                        Log.d(LOG_TAG, "TSPL command detected");
+                    } else if (isESCPOS) {
+                        Log.d(LOG_TAG, "ESC/POS command detected");
                     }
 
                     Log.d(LOG_TAG, "Sending " + bytes.length + " bytes to USB printer");
@@ -543,7 +539,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
                     // commands
                     try {
                         // Longer delay for TSPL printers to process PRINT command
-                        Thread.sleep(500); // 500ms delay for TSPL command processing
+                        Thread.sleep(800); // 500ms delay for TSPL command processing
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
@@ -651,7 +647,7 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     /**
      * Overloaded method with x, y positioning for USB printers
-     * x: Default -1 = center align, 0 = left align, > 0 = absolute position in dots
+     * x: Default -1 = center align, 0 = left align, > 0 = relative move in dots
      * y: Default 0 = top, vertical position in dots (approximate 24 dots per line)
      */
     public void printImageBase64(final Bitmap bitmapImage, int imageWidth, int imageHeight, int x, int y,
@@ -665,40 +661,30 @@ public class USBPrinterAdapter implements PrinterAdapter {
         boolean isConnected = openConnection();
         if (isConnected && mUsbDeviceConnection != null && mEndPoint != null) {
             int[][] pixels = getPixelsSlow(bitmapImage, imageWidth, imageHeight);
-
             int b = mUsbDeviceConnection.bulkTransfer(mEndPoint, SET_LINE_SPACE_24, SET_LINE_SPACE_24.length, 100000);
 
-            // Calculate image width in dots (pixels)
-            int imageWidthDots = pixels.length > 0 ? pixels[0].length : imageWidth;
-
-            // Set print position based on x parameter
+            // Set print position based on x parameter.
             if (x == 0) {
-                // Left align: use LEFT_ALIGN command (ESC a 0)
+                // Left align: use absolute left.
                 b = mUsbDeviceConnection.bulkTransfer(mEndPoint, LEFT_ALIGN, LEFT_ALIGN.length, 100000);
             } else if (x < 0) {
-                // Center align: use CENTER_ALIGN command (ESC a 1)
+                // Center align: use center alignment command.
                 b = mUsbDeviceConnection.bulkTransfer(mEndPoint, CENTER_ALIGN, CENTER_ALIGN.length, 100000);
             } else {
-                // x > 0: use Left Margin command (GS L)
-                // Format: GS L nL nH where value = nL + (nH × 256)
-                // Range: 0 ≤ nL ≤ 255, 0 ≤ nH ≤ 255, 0 ≤ (nL + (nH × 256)) ≤ 65535
+                // Positive x: move relatively from current position.
+                // Keep left align baseline before relative offset for stable behavior across printers.
+                mUsbDeviceConnection.bulkTransfer(mEndPoint, LEFT_ALIGN, LEFT_ALIGN.length, 100000);
+                byte[] setRelativePosition = getRelativePrintPosition(x);
+                b = mUsbDeviceConnection.bulkTransfer(mEndPoint, setRelativePosition, setRelativePosition.length, 100000);
+            }
 
-                // Clamp x to valid range
-                int leftMargin = x;
-                if (leftMargin < 0) leftMargin = 0;
-                if (leftMargin > 65535) leftMargin = 65535;
-
-                // Split into low byte (nL) and high byte (nH)
-                byte nL = (byte) (leftMargin & 0xFF);
-                byte nH = (byte) ((leftMargin >> 8) & 0xFF);
-
-                // Send GS L command: 0x1D 0x4C nL nH
-                byte[] setLeftMargin = new byte[] { 0x1D, 0x4C, nL, nH };
-                b = mUsbDeviceConnection.bulkTransfer(mEndPoint, setLeftMargin, setLeftMargin.length, 100000);
-
-                // Log for debugging
-                Log.d(LOG_TAG, String.format("GS L: x=%d, nL=0x%02X (%d), nH=0x%02X (%d), value=%d",
-                        x, nL & 0xFF, nL & 0xFF, nH & 0xFF, nH & 0xFF, leftMargin));
+            // Apply vertical offset before image rows.
+            if (y > 0) {
+                // Approximate dots->lines conversion (24-dot mode). Use ceil so small y still moves.
+                int linesToFeed = (y + 23) / 24;
+                for (int i = 0; i < linesToFeed; i++) {
+                    mUsbDeviceConnection.bulkTransfer(mEndPoint, LINE_FEED, LINE_FEED.length, 100000);
+                }
             }
 
             for (int rowIdx = 0; rowIdx < pixels.length; rowIdx += 24) {
@@ -723,6 +709,8 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
             mUsbDeviceConnection.bulkTransfer(mEndPoint, SET_LINE_SPACE_32, SET_LINE_SPACE_32.length, 100000);
             mUsbDeviceConnection.bulkTransfer(mEndPoint, LINE_FEED, LINE_FEED.length, 100000);
+            // Reset alignment so subsequent text/commands are not affected.
+            mUsbDeviceConnection.bulkTransfer(mEndPoint, LEFT_ALIGN, LEFT_ALIGN.length, 100000);
         } else {
             String msg = "failed to connected to device";
             Log.v(LOG_TAG, msg);
